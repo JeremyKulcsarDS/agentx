@@ -1,0 +1,6 @@
+fastapi
+geopy
+uvicorn
+requests
+pyautogen
+openai

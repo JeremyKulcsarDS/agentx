@@ -1,0 +1,6 @@
+fastapi
+pandas
+chromadb
+python-dotenv
+pyarrow
+fastparquet
