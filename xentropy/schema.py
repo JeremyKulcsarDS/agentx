@@ -12,7 +12,7 @@ class FunctionCall(BaseModel):
 
 class File(BaseModel):
     mime_type: str
-    base64Str: Base64Str
+    base64Str: str
 
 class ToolCall(BaseModel):
     id: str

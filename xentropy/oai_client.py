@@ -1,8 +1,7 @@
 import openai
-from openai._types import NotGiven
 from typing import Dict, List, Callable, Optional, Awaitable, Union
 from pydantic import BaseModel
-from xentropy.schema import Message, Content, ToolCall, Function, GenerationConfig
+from xentropy.schema import Message, Content, ToolCall, FunctionCall, Function, GenerationConfig
 
 OEPNAI_API_KW = [
     'model', 
@@ -19,24 +18,32 @@ OEPNAI_API_KW = [
     'tools',
     'top_p'
 ]
+def add_name(message:Dict, name:Optional[str]=None) -> Dict:
+    if name != None:
+        message['name'] = name
+    return message
 
 def transform_message_openai(message:Message) -> Dict:
 
     if message.role == 'system':
-        return {
-            'role': 'system',
-            'content': message.content.text,
-            'name': message.name
-        }
+        return add_name(
+            {
+                'role': 'system',
+                'content': message.content.text,
+                }, 
+            message.name
+        )
 
     if message.role == 'user':
         content = message.content
         if content.files == None and content.urls == None:
-            return {
-                'role': 'user',
-                'content': content.text,
-                'name': message.name
-            }
+            return add_name(
+                {
+                    'role': 'user',
+                    'content': content.text,
+                },
+                message.name
+            )
         _content = []
         if content.text != None:
             _content.append({
@@ -59,20 +66,25 @@ def transform_message_openai(message:Message) -> Dict:
                         'url': url.unicode_string()
                     }
                 })
-        return {
-            'role':'user',
-            'content': _content,
-            'name': message.name
-        }
+        return add_name(
+            {
+                'role':'user',
+                'content': _content,
+            }, 
+            message.name
+        )
 
     if message.role == 'assistant':
         tool_calls = message.content.tool_calls
         if tool_calls == None:
-            return {
-                'role': message.role,
-                'content': message.content.text,
-                'name': message.name
-            }
+            return add_name(
+                {
+                    'role': message.role,
+                    'content': message.content.text,
+                }, 
+                message.name
+            )
+        
         _tool_calls = []
         for tool_call in tool_calls:
             _tool_calls.append({
@@ -83,11 +95,13 @@ def transform_message_openai(message:Message) -> Dict:
                     'arguments': tool_call.function.arguments
                 }
             })
-        return {
-            'role': 'assistant',
-            'tool_calls': _tool_calls,
-            'name': message.name
-        }
+        return add_name(
+            {
+                'role': message.role,
+                'tool_calls': _tool_calls,
+            },
+            message.name
+        )
     
     if message.role == 'tool':
         return {
@@ -95,7 +109,7 @@ def transform_message_openai(message:Message) -> Dict:
             'content': message.content.tool_response.content,
             'tool_call_id': message.content.tool_response.id,
         }
-    
+
 
 class OAIClient():
     def __init__(self, generation_config:GenerationConfig):
@@ -146,7 +160,16 @@ class OAIClient():
         kw_args = {key:value for key, value in generation_config.model_dump().items() if value != None and key in OEPNAI_API_KW}
 
         if output_model != None:
-            messages.append(Message(role='user', content=Content(text='You must return a JSON object following this schema. {schema}'.format(output_model.model_json_schema))))
+            messages.append(
+                Message(
+                    role='user',
+                    content=Content(
+                        text='You must return a JSON object following this json schema. {schema}'.format(
+                            schema = output_model.model_json_schema()
+                        )
+                    )
+                )
+            )
             kw_args['response_format'] = {'type':'json_object'}
         
         _messages = []
@@ -179,8 +202,8 @@ class OAIClient():
                             ToolCall(
                                 id=tool_call.id,
                                 type=tool_call.type, 
-                                function=Function(
-                                    name=tool_call.function.name, 
+                                function=FunctionCall(
+                                    name=tool_call.function.name.lower(), 
                                     arguments=tool_call.function.arguments
                                 )
                             ) for tool_call in message.tool_calls
@@ -266,8 +289,8 @@ class OAIClient():
                             ToolCall(
                                 id=tool_call.id,
                                 type=tool_call.type, 
-                                function=Function(
-                                    name=tool_call.function.name, 
+                                function=FunctionCall(
+                                    name=tool_call.function.name.lower(), 
                                     arguments=tool_call.function.arguments
                                 )
                             ) for tool_call in message.tool_calls

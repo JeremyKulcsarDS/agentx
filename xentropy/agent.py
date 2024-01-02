@@ -1,15 +1,12 @@
 import asyncio
-import base64
 import json
-from typing import Dict, List, Callable, Optional
+from typing import Dict, List, Callable, Optional, Union
 from pydantic import BaseModel
 from xentropy.schema import Message, Content, ToolResponse, GenerationConfig, File
 import xentropy.oai_client
 import xentropy.vertexai_client
 import xentropy.bedrock_client
 
-def encode_image(image_file):
-    return base64.b64encode(image_file.read()).decode('utf-8')
 
 class Agent():
     """
@@ -68,7 +65,7 @@ class Agent():
         if self.generation_config.api_type == 'bedrock':
             self.client = xentropy.bedrock_client.BedrockClient()
 
-    def generate_response(self, messages:List[Message], output_model:Optional[BaseModel]=None) -> Message:
+    def generate_response(self, messages:List[Message], output_model:Optional[BaseModel]=None) -> Union[List[Message], Message]:
         """
         Generate a response to the given messages based on the generation config
         """
@@ -90,31 +87,33 @@ class Agent():
                         # if the key 'files' or the key 'url' is present, an additional message is generated
                         tool_responses.append(
                             Message(
-                            role='tool',
-                            content = Content(
-                                tool_response = ToolResponse(
-                                    id=tool_call.id,
-                                    content=response
-                                    )
-                                )
+                                role='tool',
+                                content = Content(
+                                    tool_response = ToolResponse(
+                                        id=tool_call.id,
+                                        content=response
+                                        )
+                                    ),
+                                name=tool_call.function.name,
                             ),
-                            name=tool_call.function.name,
                         )
+
                         deserialised_response = json.loads(response)
                         files = deserialised_response.get('files')
                         if files != None:
                             files = [File(**file) for file in files]
                         urls = deserialised_response.get('url')
-                        multimodal_responses.append(
-                            Message(
-                                role='user',
-                                content = Content(
-                                    files=files,
-                                    url=urls
-                                ),
-                                name=self.name,
+                        if files != None or urls != None:
+                            multimodal_responses.append(
+                                Message(
+                                    role='user',
+                                    content = Content(
+                                        files=files,
+                                        url=urls
+                                    ),
+                                    name=self.name,
+                                )
                             )
-                        )
             return tool_responses + multimodal_responses
 
         # determine the api_type
@@ -171,15 +170,16 @@ class Agent():
                 tool_responses.append(
                     Message(
                     role='tool',
-                    content = Content(
-                        tool_response = ToolResponse(
-                            id=tool_call.id,
-                            content=response
-                            )
-                        )
+                        content = Content(
+                            tool_response = ToolResponse(
+                                id=tool_call.id,
+                                content=response
+                                )
+                            ),
+                        name=tool_call.function.name,
                     ),
-                    name=tool_call.function.name,
                 )
+
                 deserialised_response = json.loads(response)
                 files = deserialised_response.get('files')
                 if files != None:

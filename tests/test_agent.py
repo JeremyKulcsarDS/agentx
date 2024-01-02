@@ -1,10 +1,12 @@
+import json
 from typing import List
 import unittest
 import os
 from pydantic import BaseModel
 from dotenv import load_dotenv
 from xentropy.schema import GenerationConfig, Message, Content, ToolCall, ToolResponse, Function
-from xentropy.agent import Agent, encode_image
+from xentropy.agent import Agent
+from xentropy.utils import encode_image
 
 load_dotenv()
 
@@ -38,11 +40,12 @@ class AgentTestCase(unittest.TestCase):
                 Message(role='assistant', content=Content(text='some text'), name='test')
             ]
         )
-        self.assertEqual(message_should_terminate, None)
+        self.assertIsNone(message_should_terminate)
 
-    def generate_text_response(self):
+    def test_generate_text_response(self):
         generation_config = self.generation_config
         generation_config.azure_deployment = 'gpt-35'
+
         agent = Agent(
             name='test_agnet',
             generation_config=generation_config,
@@ -53,10 +56,12 @@ class AgentTestCase(unittest.TestCase):
                 Message(role='user', content=Content(text='Tell me a joke.'), name='user')
             ]
         )
-        self.assertEqual(text_message.role == 'assistant')
+
+        self.assertEqual(text_message.role, 'assistant')
+        print(text_message.content.text)
         self.assertIsNotNone(text_message.content.text)
 
-    def generate_output_model_response(self):
+    def test_generate_output_model_response(self):
         generation_config = self.generation_config
         generation_config.azure_deployment = 'gpt-35'
         agent = Agent(
@@ -73,10 +78,11 @@ class AgentTestCase(unittest.TestCase):
 
         test_output_model = None
         try:
-            test_output_model = TestModel.model_validate_json(json_message)
-        except:
+            test_output_model = TestModel.model_validate_json(json_message.content.text)
+        except Exception as e:
+            print(e)
             pass
-        self.assertIsNotNone(test_output_model)
+        self.assertIsInstance(test_output_model, TestModel)
 
     def test_generate_response_with_tool_calls(self):
         # Create a test message with tool calls
@@ -96,7 +102,7 @@ class AgentTestCase(unittest.TestCase):
         )
         # Mock the function_map to return a response
         def test_function(**kwargs):
-            return "Response"
+            return json.dumps({'response':'success'})
         agent.function_map = {"test_function": test_function}
 
         # expect a tool call
@@ -107,7 +113,8 @@ class AgentTestCase(unittest.TestCase):
         )
 
         self.assertEqual(response.role, 'assistant')
-        self.assertIsInstance(response.content.tool_calls, List[ToolCall])
+        print(response.content.tool_calls)
+        self.assertIsInstance(response.content.tool_calls, List)
 
         # expect a response from calling the tool
         response = agent.generate_response(
@@ -118,21 +125,24 @@ class AgentTestCase(unittest.TestCase):
             ],
         )
 
-        self.assertEqual(response.role, 'tool')
-        self.assertIsInstance(response.content.tool_response, ToolResponse)
-
+        for message in response:
+            print(message.content.tool_response)
+            self.assertEqual(message.role, 'tool')
+            self.assertIsInstance(message.content.tool_response, ToolResponse)
 
     def test_generate_response_with_image(self):
         generation_config = self.generation_config
-        generation_config.azure_deployment = 'gpt-4-v'
+        generation_config.azure_deployment = 'gpt-4v'
         
         agent = Agent(
             name='test_agnet',
             generation_config=generation_config
         )
+
         # Create a test message with image
-        with open('test_image.jpg', 'rb') as f:
+        with open('./tests/test_image.jpg', 'rb') as f:
             base64Str = encode_image(f)
+
         message = Message(
             role="user",
             content=Content(
@@ -151,11 +161,12 @@ class AgentTestCase(unittest.TestCase):
 
         # Assert the response
         self.assertEqual(response.role, 'assistant')
+        print(response.content.text)
         self.assertIsInstance(response.content.text, str)
 
     def test_generate_response_with_url(self):
         generation_config = self.generation_config
-        generation_config.azure_deployment = 'gpt-4-v'
+        generation_config.azure_deployment = 'gpt-4v'
         
         agent = Agent(
             name='test_agent',
@@ -166,7 +177,7 @@ class AgentTestCase(unittest.TestCase):
             role="user",
             content=Content(
                 text='What is in this picture?',
-                urls=['https://en.wikipedia.org/wiki/Dog#/media/File:Huskiesatrest.jpg']
+                urls=['https://upload.wikimedia.org/wikipedia/en/5/5f/Original_Doge_meme.jpg']
             ),
         )
 
@@ -175,6 +186,7 @@ class AgentTestCase(unittest.TestCase):
 
         # Assert the response
         self.assertEqual(response.role, 'assistant')
+        print(response.content.text)
         self.assertIsInstance(response.content.text, str)
 
 """
