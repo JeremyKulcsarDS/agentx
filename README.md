@@ -16,11 +16,21 @@ For more information about LLM agents I highly recommend reading this [blog](htt
 
 * Load tools to your LLM agents
 * Publish your tools on the platform
-* Easy integration with a range of large language models (ChatGPT-3.5-turbo, GPT-4, ToolLlama-7B, etc.) and LLM agent libraries
+* A* search for automated planning and execution of tools orchestrated with a set of agents
+* Automatic Prompt optimisation and inference parameter search (on roadmap)
+* Supported Models
+  * ChatGPT-3.5-Turbo
+  * GPT-4
+  * GPT-4-Vision
+  * ToolLlama-7B
+  * Gemini-Pro (on roadmap)
+  * Gemini-Pro-Vision (on roadmap)
+  * Claude-2 (on roadmap)
+  * Claude-2.1 (on roadmap)
+* Easy integration with a range of LLM agent libraries
   *  [LangChain](https://github.com/langchain-ai/langchain)
   *  [Autogen](https://github.com/microsoft/autogen)
   *  [XAgent](https://github.com/OpenBMB/XAgent)
-* A* search for planning and execution of tools (on roadmap)
 
 ## Installation
 
