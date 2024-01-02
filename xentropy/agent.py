@@ -6,7 +6,7 @@ from xentropy.schema import Message, Content, ToolResponse, GenerationConfig, Fi
 import xentropy.oai_client
 import xentropy.vertexai_client
 import xentropy.bedrock_client
-
+from xentropy.utils import get_coroutine
 
 class Agent():
     """
@@ -65,7 +65,7 @@ class Agent():
         if self.generation_config.api_type == 'bedrock':
             self.client = xentropy.bedrock_client.BedrockClient()
 
-    def generate_response(self, messages:List[Message], output_model:Optional[BaseModel]=None) -> Union[List[Message], Message]:
+    def generate_response(self, messages:List[Message], output_model:Optional[BaseModel]=None) -> Union[None, Message, List[Message]]:
         """
         Generate a response to the given messages based on the generation config
         """
@@ -80,9 +80,9 @@ class Agent():
             multimodal_responses = []
             for tool_call in tool_calls:
                 if tool_call.type == 'function':
-                    function = self.function_map.get(tool_call.function.name)
+                    function = self.function_map.get(tool_call.function_call.name)
                     if function != None:
-                        response = function(**json.loads(tool_call.function.arguments))
+                        response = function(**json.loads(tool_call.function_call.arguments))
                         # the response is assumed to be a json string
                         # if the key 'files' or the key 'url' is present, an additional message is generated
                         tool_responses.append(
@@ -94,7 +94,7 @@ class Agent():
                                         content=response
                                         )
                                     ),
-                                name=tool_call.function.name,
+                                name=tool_call.function_call.name,
                             ),
                         )
 
@@ -146,7 +146,7 @@ class Agent():
         message.name = self.name
         return message
 
-    async def a_generate_response(self, messages:List[Message], output_model:Optional[BaseModel]=None):
+    async def a_generate_response(self, messages:List[Message], output_model:Optional[BaseModel]=None) -> Union[None, Message,List[Message]]:
         """
         Async version of generate_response
         """
@@ -158,9 +158,13 @@ class Agent():
         tool_calls = messages[-1].content.tool_calls
         if tool_calls != None:
             tasks = [
-                self.function_map.get(tool_call.function.name) for tool_call in tool_calls if tool_call.type == 'function'
+                get_coroutine(
+                    self.function_map.get(tool_call.function_call.name),
+                    **json.loads(tool_call.function_call.arguments)
+                 ) for tool_call in tool_calls if tool_call.type == 'function'
             ]
-            responses = asyncio.gather(*tasks)
+
+            responses = await asyncio.gather(*tasks)
 
             tool_responses = []
             multimodal_responses = []
@@ -169,14 +173,14 @@ class Agent():
                 # if the key 'files' or the key 'url' is present, an additional message is generated
                 tool_responses.append(
                     Message(
-                    role='tool',
+                        role='tool',
                         content = Content(
                             tool_response = ToolResponse(
                                 id=tool_call.id,
                                 content=response
                                 )
                             ),
-                        name=tool_call.function.name,
+                        name=tool_call.function_call.name,
                     ),
                 )
 
@@ -185,16 +189,17 @@ class Agent():
                 if files != None:
                     files = [File(**file) for file in files]
                 urls = deserialised_response.get('url')
-                multimodal_responses.append(
-                    Message(
-                        role='user',
-                        content = Content(
-                            files=files,
-                            url=urls
-                        ),
-                        name=self.name,
+                if files != None or urls != None:
+                    multimodal_responses.append(
+                        Message(
+                            role='user',
+                            content = Content(
+                                files=files,
+                                url=urls
+                            ),
+                            name=self.name,
+                        )
                     )
-                )
             return tool_responses + multimodal_responses
     
         # determine the api_type

@@ -17,7 +17,7 @@ class File(BaseModel):
 class ToolCall(BaseModel):
     id: str
     type: str
-    function: FunctionCall
+    function_call: FunctionCall
 
 class ToolResponse(BaseModel):
     id:str

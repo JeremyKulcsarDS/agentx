@@ -1,6 +1,6 @@
 from collections import defaultdict
 import json
-from typing import Any, Awaitable, Dict, List
+from typing import Any, Coroutine, Dict, List, Union
 from defusedxml import ElementTree
 import boto3
 from uuid import uuid4
@@ -123,7 +123,7 @@ Here are the tools available:
                             ToolCall(
                                 id=uuid4(),
                                 type='function',
-                                function=Function(
+                                function_call=Function(
                                     name=tool_name_from_xml,
                                     arguments=parameters
                                 ),
@@ -134,6 +134,6 @@ Here are the tools available:
         
         pass
 
-    async def a_generate(self, messages: List[Message], generation_config: Dict) -> Awaitable[Message]:
+    async def a_generate(self, messages: List[Message], generation_config: Dict) -> Union[Message, List[Message]]:
         # boto3 is not async so falling back to the sync version
         return self.generate(messages, generation_config)

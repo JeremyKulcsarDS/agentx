@@ -2,7 +2,7 @@ import google.auth
 import google.auth.transport.requests
 from google.oauth2 import service_account
 import aiohttp
-from typing import Awaitable, Callable, List, Dict, Optional
+from typing import Coroutine, Callable, List, Dict, Optional, Union
 import requests
 from xentropy.schema import Message, Content, ToolCall, Function, GenerationConfig
 
@@ -73,7 +73,7 @@ class VertexAIClient():
             messages:List[Message],
             generation_config:GenerationConfig,
             reduce_function:Optional[Callable[[List[Message]], Message]]=None
-    )-> Awaitable[Message]:
+    )-> Union[Message, List[Message]]:
         if not self.credentials.valid:
             self.credentials.refresh(self.auth_req)
         

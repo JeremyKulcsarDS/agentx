@@ -1,5 +1,5 @@
 import openai
-from typing import Dict, List, Callable, Optional, Awaitable, Union
+from typing import Dict, List, Callable, Optional, Union, Coroutine
 from pydantic import BaseModel
 from xentropy.schema import Message, Content, ToolCall, FunctionCall, Function, GenerationConfig
 
@@ -18,6 +18,7 @@ OEPNAI_API_KW = [
     'tools',
     'top_p'
 ]
+
 def add_name(message:Dict, name:Optional[str]=None) -> Dict:
     if name != None:
         message['name'] = name
@@ -91,8 +92,8 @@ def transform_message_openai(message:Message) -> Dict:
                 'id': tool_call.id,
                 'type': tool_call.type,
                 'function': {
-                    'name': tool_call.function.name,
-                    'arguments': tool_call.function.arguments
+                    'name': tool_call.function_call.name,
+                    'arguments': tool_call.function_call.arguments
                 }
             })
         return add_name(
@@ -202,7 +203,7 @@ class OAIClient():
                             ToolCall(
                                 id=tool_call.id,
                                 type=tool_call.type, 
-                                function=FunctionCall(
+                                function_call=FunctionCall(
                                     name=tool_call.function.name.lower(), 
                                     arguments=tool_call.function.arguments
                                 )
@@ -250,13 +251,22 @@ class OAIClient():
         generation_config: GenerationConfig,
         reduce_function: Optional[Callable[[List[Message]], Message]]=None,
         output_model:BaseModel = None
-    ) -> Awaitable[Union[Message, List[Message]]]:
+    ) -> Union[Message, List[Message]]:
         # call the openai api
 
         kw_args = {key:value for key, value in generation_config.model_dump().items() if value != None and key in OEPNAI_API_KW}
 
         if output_model != None:
-            messages.append(Message(role='user', content=Content(text='You must return a JSON object following this schema. {schema}'.format(output_model.model_json_schema))))
+            messages.append(
+                Message(
+                    role='user', 
+                    content=Content(
+                        text='You must return a JSON object following this json schema. {schema}'.format(
+                            schema=output_model.model_json_schema()
+                        )
+                    )
+                )
+            )
             kw_args['response_format'] = {'type':'json_object'}
         
         _messages = []
@@ -275,7 +285,7 @@ class OAIClient():
             kw_args['model'] = generation_config.azure_deployment
 
         while num_retry < generation_config.max_retries:
-            response = self.client.chat.completions.create(
+            response = await self.a_client.chat.completions.create(
                 messages=[transform_message_openai(message) for message in messages],
                 **kw_args
             )
@@ -289,7 +299,7 @@ class OAIClient():
                             ToolCall(
                                 id=tool_call.id,
                                 type=tool_call.type, 
-                                function=FunctionCall(
+                                function_call=FunctionCall(
                                     name=tool_call.function.name.lower(), 
                                     arguments=tool_call.function.arguments
                                 )

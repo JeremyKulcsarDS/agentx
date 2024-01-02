@@ -57,6 +57,27 @@ class OAIClientTest(unittest.TestCase):
     def test_generate_responses(self):
         pass
 
+class AsyncOAIClientTest(unittest.IsolatedAsyncioTestCase):
+    def setUp(self):
+        self.generation_config = GenerationConfig(
+            api_type='azure',
+            api_key=os.environ.get('AZURE_OPENAI_KEY'),
+            base_url=os.environ.get('AZURE_OPENAI_ENDPOINT'),
+            azure_deployment='gpt-35',
+        )
+        self.client = OAIClient(generation_config=self.generation_config)
+
+    async def test_generate_response(self):
+        response = await self.client.a_generate(
+            messages=[
+                Message(role='system', content=Content(text='You are a helpful assistant.'), name='test_agnet'),
+                Message(role='user', content=Content(text='Tell me a joke.'), name='user')
+            ],
+            generation_config=self.generation_config,
+            reduce_function=lambda x: x[-1]
+        )
+        print(response.content.text)
+        self.assertIsNotNone(response.content.text)
 
 class VertexAIClientTest(unittest.TestCase):
     def test_generate_response_with_image(self):
