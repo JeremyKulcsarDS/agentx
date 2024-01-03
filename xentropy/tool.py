@@ -1,7 +1,6 @@
 from hashlib import sha256
 import uuid
-import xentropy
-import importlib
+import xentropy.models
 import requests
 import aiohttp
 import os
@@ -9,6 +8,7 @@ import json
 from os.path import dirname
 from pydantic import BaseModel, AnyHttpUrl
 from typing import Dict, Optional
+from importlib import reload
 
 
 def to_camel_case(snake: str):
@@ -73,11 +73,11 @@ class Tool():
             if key in ['input_model', 'output_model']:
                 path = dirname(__file__)
                 filename = name.replace('--', '_')
-                with open(f'{path}/{filename}_{key}.py', 'w') as f:
+                with open(f'{path}/models/{filename}_{key}.py', 'w') as f:
                     f.write(value)
-                importlib.reload(xentropy)
-                module = getattr(xentropy, f'{filename}_{key}')
-                model = getattr(module, to_camel_case(key))
+                module = reload(xentropy.models)
+                submodule = getattr(module, f'{filename}_{key}')
+                model = getattr(submodule, to_camel_case(key))
                 setattr(tool, key, model)
                 continue
             setattr(tool, key, value)
