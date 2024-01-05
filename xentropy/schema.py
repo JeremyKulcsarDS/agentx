@@ -1,4 +1,4 @@
-from pydantic import BaseModel, HttpUrl, Base64Str, FilePath
+from pydantic import BaseModel, HttpUrl, FilePath
 from typing import Dict, List, Optional, Union, Literal
 
 class Function(BaseModel):
@@ -21,6 +21,7 @@ class ToolCall(BaseModel):
 
 class ToolResponse(BaseModel):
     id:str
+    name:str
     content:str
 
 class Content(BaseModel):
@@ -90,6 +91,6 @@ class GenerationConfig(BaseModel):
     stop_sequences: Optional[List[str]] = None
     temperature: Optional[float] = None
     tool_choice: Optional[Union[str, Dict[str, Union[str, Dict[str, str]]]]] = None
-    tools: Optional[List[Function]] = None
+    tools: Optional[Dict[str, Function]] = None
     top_p: Optional[int] = None
     top_k: Optional[int] = None

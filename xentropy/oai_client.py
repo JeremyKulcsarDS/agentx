@@ -31,7 +31,7 @@ def transform_message_openai(message:Message) -> Dict:
             {
                 'role': 'system',
                 'content': message.content.text,
-                }, 
+                },
             message.name
         )
 
@@ -80,7 +80,7 @@ def transform_message_openai(message:Message) -> Dict:
         if tool_calls == None:
             return add_name(
                 {
-                    'role': message.role,
+                    'role': 'assistant',
                     'content': message.content.text,
                 }, 
                 message.name
@@ -98,7 +98,8 @@ def transform_message_openai(message:Message) -> Dict:
             })
         return add_name(
             {
-                'role': message.role,
+                'role': 'assistant',
+                'content':'',
                 'tool_calls': _tool_calls,
             },
             message.name
@@ -182,7 +183,7 @@ class OAIClient():
                 {
                     'type':'function',
                     'function':tool.model_dump()
-                } for tool in generation_config.tools
+                } for tool in generation_config.tools.values()
             ]
         
         if generation_config.api_type == 'azure':
@@ -278,7 +279,7 @@ class OAIClient():
                 {
                     'type':'function',
                     'function':tool.model_dump()
-                } for tool in generation_config.tools
+                } for tool in generation_config.tools.values()
             ]
         
         if generation_config.api_type == 'azure':

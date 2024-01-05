@@ -85,16 +85,22 @@ class AgentTestCase(unittest.TestCase):
         self.assertIsInstance(test_output_model, TestModel)
 
     def test_generate_response_with_tool_calls_wo_image(self):
+        _messages = []
         # Create a test message with tool calls
         generation_config = self.generation_config
         generation_config.azure_deployment = 'gpt-35'
-        generation_config.tools = [
-            Function(
-                name='test_function',
+        generation_config.tools = {
+            'test_function_0':Function(
+                name='test_function_0',
                 description='this function test if LLM agent can make function calls.',
                 parameters=TestModel.model_json_schema()
-            )
-        ]
+            ), 
+            'test_function_1':Function(
+                name='test_function_1',
+                description='this function test if LLM agent can make function calls.',
+                parameters=TestModel.model_json_schema()
+            ),
+        }
         agent = Agent(
             name='test_agnet',
             system_prompt='You are a helpful assistant. Use the function you have been provided.',
@@ -103,32 +109,46 @@ class AgentTestCase(unittest.TestCase):
         # Mock the function_map to return a response
         def test_function(**kwargs):
             return json.dumps({'response':'success'})
-        agent.function_map = {"test_function": test_function}
+        agent.function_map = {
+            "test_function_0": test_function,
+            "test_function_1": test_function
+        }
 
+        _messages.append(
+            Message(
+                role='user', 
+                content=Content(
+                    text='Call test_function_0 and test_function_1 for a test'), 
+                    name='user'
+                )
+        )
         # expect a tool call
         response = agent.generate_response(
-            messages=[
-                Message(role='user', content=Content(text='Call test_function for a test'), name='user')
-            ],
+            messages=_messages
         )
 
         self.assertEqual(response.role, 'assistant')
         print(response.content.tool_calls)
         self.assertIsInstance(response.content.tool_calls, List)
 
+        _messages.append(response)
         # expect a response from calling the tool
         response = agent.generate_response(
-            messages=[
-                Message(role='system', content=Content(text='You are a helpful assistant. Use the function you have been provided.'), name='test_agnet'),
-                Message(role='user', content=Content(text='Call test_function for a test'), name='user'),
-                response
-            ],
+            messages=_messages
         )
 
         for message in response:
             print(message.content.tool_response)
             self.assertEqual(message.role, 'tool')
             self.assertIsInstance(message.content.tool_response, ToolResponse)
+        
+        _messages.extend(response)
+        response = agent.generate_response(
+            messages=_messages
+        )
+
+        self.assertEqual(response.role, 'assistant')
+        self.assertIsNotNone(response.content.text)
 
     def test_generate_response_with_image(self):
         generation_config = self.generation_config
@@ -263,13 +283,18 @@ class AsyncAgentTestCase(unittest.IsolatedAsyncioTestCase):
         # Create a test message with tool calls
         generation_config = self.generation_config
         generation_config.azure_deployment = 'gpt-35'
-        generation_config.tools = [
-            Function(
-                name='test_function',
+        generation_config.tools = {
+            'test_function_0':Function(
+                name='test_function_0',
                 description='this function test if LLM agent can make function calls.',
                 parameters=TestModel.model_json_schema()
-            )
-        ]
+            ), 
+            'test_function_1':Function(
+                name='test_function_1',
+                description='this function test if LLM agent can make function calls.',
+                parameters=TestModel.model_json_schema()
+            ),
+        }
         agent = Agent(
             name='test_agnet',
             system_prompt='You are a helpful assistant. Use the function you have been provided.',

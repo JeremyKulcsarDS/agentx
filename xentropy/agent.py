@@ -91,9 +91,10 @@ class Agent():
                                 content = Content(
                                     tool_response = ToolResponse(
                                         id=tool_call.id,
+                                        name=tool_call.function_call.name,
                                         content=response
-                                        )
-                                    ),
+                                    )
+                                ),
                                 name=tool_call.function_call.name,
                             ),
                         )
@@ -177,9 +178,10 @@ class Agent():
                         content = Content(
                             tool_response = ToolResponse(
                                 id=tool_call.id,
+                                name=tool_call.function_call.name,
                                 content=response
-                                )
-                            ),
+                            )
+                        ),
                         name=tool_call.function_call.name,
                     ),
                 )
@@ -231,12 +233,3 @@ class Agent():
             
         message.name = self.name
         return message
-
-
-    def automatic_prompt_optimization(self, dataset:List[Dict], loss_function:Callable[..., float]):
-        """
-        Automatic Prompt Optimisation (APO) implementation of https://arxiv.org/abs/2305.03495
-        This function fits a system prompt to a given dataset.
-        Work in progress
-        """
-        pass

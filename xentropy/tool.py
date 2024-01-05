@@ -34,21 +34,15 @@ class Tool():
         self.name: Optional[str] = kwargs.get('name')
         self.description: Optional[str] = kwargs.get('description')
         self.input_model: Optional[BaseModel] = kwargs.get('input_model')
-        self.input_json_schema: Optional[str] = kwargs.get('input_json_schema')
+        self.input_json_schema: Optional[Dict] = kwargs.get('input_json_schema')
         self.output_model: Optional[BaseModel] = kwargs.get('output_model')
-        self.output_json_schema: Optional[BaseModel] = kwargs.get(
+        self.output_json_schema: Optional[Dict] = kwargs.get(
             'output_json_schema')
         self.endpoint: Optional[AnyHttpUrl] = kwargs.get('endpoint')
         self.dynamic_price: Optional[AnyHttpUrl] = kwargs.get('dynamic_price')
         self.price: Optional[int] = kwargs.get('price')
         self.free_quota: Optional[int] = kwargs.get('free_quota')
         self.endpoint: Optional[AnyHttpUrl] = kwargs.get('endpoint')
-
-    def input_model_schema(self) -> Dict:
-        return json.loads(self.input_json_schema)
-
-    def output_model_schema(self) -> Dict:
-        return json.loads(self.output_json_schema)
 
     @classmethod
     def load(cls, name, api_key):
@@ -68,7 +62,7 @@ class Tool():
 
         if 'exception' in response.keys():
             raise Exception(response['exception'])
-
+        
         for key, value in response.items():
             if key in ['input_model', 'output_model']:
                 path = dirname(__file__)
@@ -80,6 +74,11 @@ class Tool():
                 model = getattr(submodule, to_camel_case(key))
                 setattr(tool, key, model)
                 continue
+            
+            if key in ['input_json_schema', 'output_json_schema']:
+                setattr(tool, key, json.loads(value))
+                continue
+            
             setattr(tool, key, value)
 
         return tool
@@ -90,19 +89,19 @@ class Tool():
             webhook_secret = sha256(uuid.uuid4().bytes).hexdigest()
 
         assert (self.input_model != None)
-        self.input_json_schema = self.input_model.schema_json()
+        self.input_json_schema = self.input_model.model_json_schema()
 
-        self.output_json_schema = StringOutput.schema_json()
+        self.output_json_schema = StringOutput.model_json_schema()
         if self.output_model != None:
-            self.output_json_schema = self.output_model.schema_json()
+            self.output_json_schema = self.output_model.model_json_schema()
 
         response = requests.post(
             f'https://api.xentropy.co/tool',
             json={
                 'name': self.name,
                 'description': self.description,
-                'input_json_schema': self.input_json_schema,
-                'output_json_schema': self.output_json_schema,
+                'input_json_schema': json.dumps(self.input_json_schema),
+                'output_json_schema': json.dumps(self.output_json_schema),
                 'endpoint': self.endpoint,
                 'price': self.price,
                 'free_quota': self.free_quota,
@@ -153,7 +152,7 @@ class Tool():
         if status >= 300:
             raise Exception(response.get('error_message'))
 
-        return json.loads(response.get('response'))
+        return response.get('response')
 
     async def arun(
         self,
@@ -186,4 +185,4 @@ class Tool():
                 if status >= 300:
                     raise Exception(response.get('error_message'))
 
-                return json.loads(response.get('response'))
+                return response.get('response')
