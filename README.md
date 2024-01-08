@@ -1,4 +1,4 @@
-# XEntropy-SDK
+# AgentX
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
