@@ -39,7 +39,7 @@ class Agent():
     def __init__(
         self,
         name:str,
-        system_prompt:str=None,
+        system_prompt:Optional[str]=None,
         generation_config:GenerationConfig=None,
         function_map:Dict[str, Callable]=None,
         termination_function:Callable[[List[Message]], bool]=lambda x: False,

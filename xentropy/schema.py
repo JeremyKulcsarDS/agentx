@@ -36,6 +36,10 @@ class Message(BaseModel):
     content: Content
     name:Optional[str] = None
 
+    # use for comparing if two messages are the same, exclude ID
+    def __hash__(self):
+        return hash(self.model_dump_json(exclude='id'))
+
 class GenerationConfig(BaseModel):
     """
     Configuration class for generation settings.

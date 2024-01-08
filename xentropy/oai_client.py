@@ -1,10 +1,11 @@
 import openai
-from typing import Dict, List, Callable, Optional, Union, Coroutine
+from openai.types.chat import ChatCompletion, ChatCompletionMessageToolCall
+from typing import Dict, List, Callable, Optional, Union
 from pydantic import BaseModel
 from xentropy.schema import Message, Content, ToolCall, FunctionCall, Function, GenerationConfig
 
 OEPNAI_API_KW = [
-    'model', 
+    'model',
     'frequency_penalty',
     'logit_bias',
     'max_tokens',
@@ -190,15 +191,18 @@ class OAIClient():
             kw_args['model'] = generation_config.azure_deployment
 
         while num_retry < generation_config.max_retries:
-            response = self.client.chat.completions.create(
+            response:ChatCompletion = self.client.chat.completions.create(
                 messages=[transform_message_openai(message) for message in messages],
                 **kw_args
             )
-        
+
             generated_messages = [choice.message for choice in response.choices]
 
             for message in generated_messages:
                 if message.tool_calls != None:
+                    # deterministic ordering of tool calls
+                    tool_calls:List[ChatCompletionMessageToolCall] = sorted(message.tool_calls, key=lambda x: x.function.name)
+                    
                     content = Content(
                         tool_calls=[
                             ToolCall(
@@ -208,7 +212,7 @@ class OAIClient():
                                     name=tool_call.function.name.lower(), 
                                     arguments=tool_call.function.arguments
                                 )
-                            ) for tool_call in message.tool_calls
+                            ) for tool_call in tool_calls
                         ]
                     )
                 else:

@@ -14,7 +14,7 @@ def get_coroutine(function:Callable, **kwargs) -> Coroutine:
             return function(**kwargs)
         return wrapper()
 
-def add_to_messages(messages:List[Message], message:Union[Message, List[Message]]) -> List[Message]:
+def append_to_messages(messages:List[Message], message:Union[Message, List[Message]]) -> List[Message]:
     if isinstance(message, list):
         messages.extend(message)
     else:

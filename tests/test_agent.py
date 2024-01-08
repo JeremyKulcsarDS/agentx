@@ -47,7 +47,7 @@ class AgentTestCase(unittest.TestCase):
         generation_config.azure_deployment = 'gpt-35'
 
         agent = Agent(
-            name='test_agnet',
+            name='test_agent',
             generation_config=generation_config,
         )
         text_message = agent.generate_response(

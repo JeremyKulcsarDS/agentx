@@ -1,21 +1,19 @@
 import asyncio
 import queue
-import json
 from xentropy.agent import Agent, Message
-from typing import Callable, List, Dict, Optional
+from typing import Callable, List, Union, Tuple, Dict
 
 
 async def astarchat(
         agents: List[Agent],
         messages: List[Message],
-        cost: Callable,
-        heuristic: Callable,
-        starting_priority: int=100,
+        cost: Callable[[List[Message]], float],
+        heuristic: Callable[[List[Message]], float],
         threshold: int=10,
         n_replies: int=1,
         max_iteration:int=10,
         max_queue_size:int=10,
-):
+) -> Tuple[List[Message], Dict[str, Union[str, None]], Dict[str, int], dict[str, List[Message]]]:
     """
     Start the chat, with the first agent initiating the conversation
 
@@ -37,56 +35,70 @@ async def astarchat(
     frontier = queue.PriorityQueue(maxsize=max_queue_size)
 
     # Place first message to the frontier queue
-    frontier.put((starting_priority, messages))
+    frontier.put((0, [messages]))
 
-    came_from: dict[str, Optional[Dict]] = {}
-    cost_so_far: dict[str, int] = {}
+    came_from: Dict[Tuple[int], Union[Tuple[int], None]] = {}
+    cost_so_far: Dict[Tuple[int], float] = {}
 
-    came_from[json.dumps(messages)] = None
-    cost_so_far[json.dumps(messages)] = 0
+    first_hash = tuple([hash(message) for message in messages])
+    came_from[first_hash] = None
+    cost_so_far[first_hash] = 0
+
+    hash_map: dict[Union[Tuple[int], Tuple[Message]], Union[Tuple[int], Tuple[Message]]] = {
+        first_hash: tuple(messages),
+        tuple(messages): first_hash,
+    }
 
     while (not frontier.empty()) and (current_iteration < max_iteration):
         current_iteration += 1
-        # Pick the next set of messages for the conversation
-        current_messages: List[Dict] = frontier.get()[1]
-
+        # Pick the next list of messages for the conversation
+        current_messages: List[List[Message]] = frontier.get()[1]
+        flatten_current_messages: List[Message] = [message for sublist in current_messages for message in sublist]
+        
         # Generate a list of responses from the participating agents
         participating_agents = agents
 
-        function_call = current_messages[-1].get('function_call', None)
-        if function_call != None:
-            participating_agents = [agent for agent in agents if agent.function_map.get(function_call.get('name'))]
+        tool_calls = flatten_current_messages[-1].content.tool_calls
+        if tool_calls != None:
+            function_names = [tool_call.function_call.name for tool_call in tool_calls]
+            participating_agents = [
+                agent for agent in agents if set(function_names).issubset(agent.function_map.keys())
+            ]
         
         tasks = [
-            [agent.a_generate_reply(current_messages) for i in range(n_replies)] for agent in participating_agents
+            [
+                agent.a_generate_response(flatten_current_messages) for i in range(n_replies)
+            ] for agent in participating_agents
         ]
         # Flatten the list of tasks
         tasks = [item for sublist in tasks for item in sublist]
 
-        generated_messages = await asyncio.gather(*tasks)
-        generated_messages = [message for message in generated_messages if message != None]
-        
-        for message in generated_messages:
-            message.pop('tool_calls', None)
+        generated_messages:List[Union[Message, List[Message], None]] = await asyncio.gather(*tasks)
+        generated_messages:List[Union[Message, List[Message]]] = [message for message in generated_messages if message != None]
+        generated_messages:List[List[Message]] = [message if isinstance(message, List) else [message] for message in generated_messages]
 
         for next in generated_messages:
-            if next == None:
-                continue
-            if isinstance(next, str):
-                next = {'content': next, "role": "assistant"}
             # calculate the cost of the new message
-            new_cost = cost_so_far[json.dumps(current_messages)] + cost(current_messages, next)
-            previous_cost = cost_so_far.get(json.dumps(current_messages + [next]), None)
+            new_cost = cost_so_far[hash_map[tuple(current_messages[-1])]] + cost(flatten_current_messages, next)
+            hash_next_message = tuple([hash(message) for message in next])
+            previous_cost = cost_so_far.get(hash_next_message, None)
             # the message is never seen before or the new cost is less than the previous cost
             if previous_cost == None or new_cost < previous_cost:
-                cost_so_far[json.dumps(current_messages + [next])] = new_cost
+                cost_so_far[hash_next_message] = new_cost
+                hash_map[hash_next_message] = tuple(next)
+                hash_map[tuple(next)] = hash_next_message
                 print(current_messages + [next])
-                heuristic_score = heuristic(current_messages + [next])
+                heuristic_score = heuristic(flatten_current_messages + next)
                 priority = new_cost + heuristic_score
                 # Add the new message to the frontier
                 frontier.put((priority, current_messages + [next]))
-                came_from[json.dumps(current_messages + [next])] = current_messages
+                came_from[hash_next_message] = hash_map[tuple(current_messages[-1])]
                 if heuristic_score < threshold:
-                    return came_from, cost_so_far
+                    reconstructed_path:List[Message] = []
+                    return reconstructed_path, came_from, cost_so_far, hash_map
 
-    return came_from, cost_so_far
+    # TODO: reconstruct the path
+    reconstructed_path:List[Message] = []
+
+    return reconstructed_path, came_from, cost_so_far, hash_map
+
