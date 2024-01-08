@@ -82,7 +82,7 @@ async def astarchat(
         if tool_calls != None:
             function_names = [tool_call.function_call.name for tool_call in tool_calls]
             participating_agents = [
-                agent for agent in agents if set(function_names).issubset(agent.function_map.keys())
+                agent for agent in agents if set(function_names).issubset(agent.a_function_map.keys())
             ]
         
         tasks = [
