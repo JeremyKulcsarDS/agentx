@@ -38,17 +38,18 @@ For more information about LLM agents I highly recommend reading this [blog](htt
 To install the project, clone this repository and copy to your python site-packages directory:
 
 ```bash
-git clone https://github.com/ckh112/xentropy.git
-cp -r xentropy/src/xentropy /usr/local/lib/python3.8/site-packages/ # replace with your own site-packages directory
+git clone https://github.com/xentropy-ai/agentx.git
+cd agentx
+cp -r agentx /usr/local/lib/python3.8/site-packages/ # replace with your own site-packages directory
 ```
 
 ## Documentation
 
-Refer to the [docs](https://github.com/ckh112/xentropy/docs) for advanced usage and full documentation of all the features of XEntropy-SDK.
+Refer to the [docs](https://github.com/xentropy-ai/agentx/docs) for advanced usage and full documentation of all the features of XEntropy-SDK.
 
 ## Contribution
 
-If you want to contribute, feel free to fork the repository and submit pull requests. If you found any bugs or have suggestions, please create an issue in the [issues](https://github.com/ckh112/xentropy/issues) section.
+If you want to contribute, feel free to fork the repository and submit pull requests. If you found any bugs or have suggestions, please create an issue in the [issues](https://github.com/xentropy-ai/agentx/issues) section.
 
 ## Contact
 
