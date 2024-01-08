@@ -7,12 +7,19 @@ from dotenv import load_dotenv
 from agentx.schema import GenerationConfig, Message, Content, ToolResponse, Function
 from agentx.agent import Agent
 from agentx.utils import encode_image
+from agentx.tool import Tool
 
 load_dotenv()
 
 class TestModel(BaseModel):
     timestamp:int
     name:str
+
+class TestTool(Tool):
+    def run(self, **kwargs):
+        return json.dumps({'response':'success'})
+    async def arun(self, **kwargs):
+        return json.dumps({'response':'success'})
 
 class AgentTestCase(unittest.TestCase):
     
@@ -87,32 +94,27 @@ class AgentTestCase(unittest.TestCase):
     def test_generate_response_with_tool_calls_wo_image(self):
         _messages = []
         # Create a test message with tool calls
+        tools = [
+            TestTool(
+                name='test_tool_0',
+                description='this function test if LLM agent can make function calls.',
+                input_json_schema=TestModel.model_json_schema()
+            ),
+            TestTool(
+                name='test_tool_1',
+                description='this function test if LLM agent can make function calls.',
+                input_json_schema=TestModel.model_json_schema()
+            ),
+        ]
         generation_config = self.generation_config
         generation_config.azure_deployment = 'gpt-35'
-        generation_config.tools = {
-            'test_function_0':Function(
-                name='test_function_0',
-                description='this function test if LLM agent can make function calls.',
-                parameters=TestModel.model_json_schema()
-            ), 
-            'test_function_1':Function(
-                name='test_function_1',
-                description='this function test if LLM agent can make function calls.',
-                parameters=TestModel.model_json_schema()
-            ),
-        }
+
         agent = Agent(
             name='test_agnet',
             system_prompt='You are a helpful assistant. Use the function you have been provided.',
             generation_config=generation_config,
+            tools = tools
         )
-        # Mock the function_map to return a response
-        def test_function(**kwargs):
-            return json.dumps({'response':'success'})
-        agent.function_map = {
-            "test_function_0": test_function,
-            "test_function_1": test_function
-        }
 
         _messages.append(
             Message(
@@ -281,29 +283,28 @@ class AsyncAgentTestCase(unittest.IsolatedAsyncioTestCase):
 
     async def test_a_generate_response_with_tool_calls_wo_image(self):
         # Create a test message with tool calls
+        tools = [
+            TestTool(
+                name='test_tool_0',
+                description='this function test if LLM agent can make function calls.',
+                input_json_schema=TestModel.model_json_schema()
+            ),
+            TestTool(
+                name='test_tool_1',
+                description='this function test if LLM agent can make function calls.',
+                input_json_schema=TestModel.model_json_schema()
+            ),
+        ]
+
         generation_config = self.generation_config
         generation_config.azure_deployment = 'gpt-35'
-        generation_config.tools = {
-            'test_function_0':Function(
-                name='test_function_0',
-                description='this function test if LLM agent can make function calls.',
-                parameters=TestModel.model_json_schema()
-            ), 
-            'test_function_1':Function(
-                name='test_function_1',
-                description='this function test if LLM agent can make function calls.',
-                parameters=TestModel.model_json_schema()
-            ),
-        }
+
         agent = Agent(
             name='test_agnet',
             system_prompt='You are a helpful assistant. Use the function you have been provided.',
             generation_config=generation_config,
+            tools = tools
         )
-        # Mock the function_map to return a response
-        async def test_function(**kwargs):
-            return json.dumps({'response':'success'})
-        agent.function_map = {"test_function": test_function}
 
         # expect a tool call
         response = await agent.a_generate_response(
