@@ -45,7 +45,7 @@ cp -r agentx /usr/local/lib/python3.8/site-packages/ # replace with your own sit
 
 ## Documentation
 
-Refer to the [docs](https://github.com/xentropy-ai/agentx/docs) for advanced usage and full documentation of all the features of XEntropy-SDK.
+Refer to the [docs](https://github.com/xentropy-ai/agentx/tree/main/docs) for advanced usage and full documentation of all the features of XEntropy-SDK.
 
 ## Contribution
 
