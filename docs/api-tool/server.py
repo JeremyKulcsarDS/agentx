@@ -1,38 +1,40 @@
-# +
 import fastapi
-from fastapi import HTTPException
-import requests
+from fastapi import Header, HTTPException
 import os
 from typing import Annotated
 from dotenv import load_dotenv
 from pydantic import BaseModel
+from geopy import distance
 
 load_dotenv()
 
 app = fastapi.FastAPI()
 
-
-class Address(BaseModel):
-    address: str
+# Structure of the function inputs
 
 
-@app.post('/geocoding')
-async def geocoding(address: Address, webhook_secret: Annotated[str, fastapi.Header()]):
+class Coordinate(BaseModel):
+    latitude: float
+    longitude: float
+
+
+class CoordinatePair(BaseModel):
+    coordinate_0: Coordinate
+    coordinate_1: Coordinate
+
+
+@app.post('/geodesic')
+async def geodesic(coordinate_pair: CoordinatePair, webhook_secret: Annotated[str, fastapi.Header()]):
 
     # make sure the request is sent from XEntropy
     if webhook_secret != os.environ.get('WEBHOOK_SECRET'):
         raise HTTPException(502, 'Webhook-Secret header cannot be none.')
 
-    geocoding = requests.get(
-        'https://maps.googleapis.com/maps/api/geocode/json',
-        params={
-            'address': address.address,
-            # YOUR Google Cloud API Key
-            'key': os.environ.get('GOOGLE_CLOUD_API_KEY')
-        }
-    ).json()
-    location = geocoding.get('results')[0].get('geometry').get('location')
-    result = {'latitude': location.get(
-        'lat'), 'longitude': location.get('lng')}
+    geodesic_distance = distance.distance(
+        tuple(coordinate_pair.coordinate_0.dict().values()),
+        tuple(coordinate_pair.coordinate_1.dict().values()),
+    ).km
+
+    result = {'geodesic_distance': geodesic_distance, 'unit': 'km'}
 
     return result

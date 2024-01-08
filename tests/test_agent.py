@@ -4,7 +4,7 @@ import unittest
 import os
 from pydantic import BaseModel
 from dotenv import load_dotenv
-from agentx.schema import GenerationConfig, Message, Content, ToolCall, ToolResponse, Function
+from agentx.schema import GenerationConfig, Message, Content, ToolResponse, Function
 from agentx.agent import Agent
 from agentx.utils import encode_image
 

@@ -3,6 +3,19 @@ import queue
 from agentx.agent import Agent, Message
 from typing import Callable, List, Union, Tuple, Dict
 
+def reconstruct_path(
+    came_from:Dict[Tuple[int], Union[Tuple[int], None]],
+    goal:Tuple[int],
+    hash_map:dict[Union[Tuple[int], Tuple[Message]], Union[Tuple[int], Tuple[Message]]]
+) -> List[Message]:
+    current = goal
+    path = []
+    # start is None
+    while current != None:
+        path.extend(list(hash_map[current]))
+        current = came_from[current]
+    path.reverse()
+    return path
 
 async def astarchat(
         agents: List[Agent],
@@ -13,7 +26,13 @@ async def astarchat(
         n_replies: int=1,
         max_iteration:int=10,
         max_queue_size:int=10,
-) -> Tuple[List[Message], Dict[str, Union[str, None]], Dict[str, int], dict[str, List[Message]]]:
+) -> Tuple[
+        List[Message], 
+        Dict[Tuple[int], Union[Tuple[int], None]], 
+        Dict[Tuple[int], float],
+        Dict[Tuple[int], float],
+        Dict[Union[Tuple[int], Tuple[Message]], Union[Tuple[int], Tuple[Message]]]
+    ]:
     """
     Start the chat, with the first agent initiating the conversation
 
@@ -39,12 +58,13 @@ async def astarchat(
 
     came_from: Dict[Tuple[int], Union[Tuple[int], None]] = {}
     cost_so_far: Dict[Tuple[int], float] = {}
+    heuristic_map: Dict[Tuple[int], float] = {}
 
     first_hash = tuple([hash(message) for message in messages])
     came_from[first_hash] = None
     cost_so_far[first_hash] = 0
 
-    hash_map: dict[Union[Tuple[int], Tuple[Message]], Union[Tuple[int], Tuple[Message]]] = {
+    hash_map: Dict[Union[Tuple[int], Tuple[Message]], Union[Tuple[int], Tuple[Message]]] = {
         first_hash: tuple(messages),
         tuple(messages): first_hash,
     }
@@ -89,16 +109,25 @@ async def astarchat(
                 hash_map[tuple(next)] = hash_next_message
                 print(current_messages + [next])
                 heuristic_score = heuristic(flatten_current_messages + next)
+                heuristic_map[hash_next_message] = heuristic_score
                 priority = new_cost + heuristic_score
                 # Add the new message to the frontier
                 frontier.put((priority, current_messages + [next]))
                 came_from[hash_next_message] = hash_map[tuple(current_messages[-1])]
                 if heuristic_score < threshold:
-                    reconstructed_path:List[Message] = []
-                    return reconstructed_path, came_from, cost_so_far, hash_map
+                    reconstructed_path:List[Message] = reconstruct_path(
+                        came_from=came_from,
+                        goal=hash_next_message,
+                        hash_map=hash_map
+                    )
+                    return reconstructed_path, came_from, cost_so_far, heuristic_map, hash_map 
 
-    # TODO: reconstruct the path
-    reconstructed_path:List[Message] = []
+    goal = heuristic_map[min(heuristic_map, key=heuristic_map.get)]
+    reconstructed_path:List[Message] = reconstruct_path(
+        came_from=came_from,
+        goal=goal,
+        hash_map=hash_map,
+    )
 
-    return reconstructed_path, came_from, cost_so_far, hash_map
+    return reconstructed_path, came_from, cost_so_far, heuristic_map, hash_map
 
