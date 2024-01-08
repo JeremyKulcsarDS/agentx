@@ -6,7 +6,7 @@ from typing import Callable, List, Union, Tuple, Dict
 def reconstruct_path(
     came_from:Dict[Tuple[int], Union[Tuple[int], None]],
     goal:Tuple[int],
-    hash_map:dict[Union[Tuple[int], Tuple[Message]], Union[Tuple[int], Tuple[Message]]]
+    hash_map:Dict[Union[Tuple[int], Tuple[Message]], Union[Tuple[int], Tuple[Message]]]
 ) -> List[Message]:
     current = goal
     path = []
