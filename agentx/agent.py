@@ -2,11 +2,11 @@ import asyncio
 import json
 from typing import Dict, List, Callable, Optional, Union
 from pydantic import BaseModel
-from agentx.schema import Message, Content, ToolResponse, GenerationConfig, File
+from agentx.schema import Message, Content, ToolResponse, GenerationConfig, File, Function
+from agentx.tool import Tool
 import agentx.oai_client
 import agentx.vertexai_client
 import agentx.bedrock_client
-from agentx.utils import get_coroutine
 
 class Agent():
     """
@@ -41,14 +41,25 @@ class Agent():
         name:str,
         system_prompt:Optional[str]=None,
         generation_config:GenerationConfig=None,
-        function_map:Dict[str, Callable]=None,
+        tools:Optional[List[Tool]]=None,
         termination_function:Callable[[List[Message]], bool]=lambda x: False,
         reduce_function:Callable[[List[Message]], Message]=lambda x: x[-1],
     ):
+        if tools != None:
+            function_map = {tool.name: tool.run for tool in tools}
+            a_function_map = {tool.name: tool.arun for tool in tools}
+            generation_config.tools = {
+                tool.name:Function(
+                    name=tool.name,
+                    description=tool.description,
+                    parameters=tool.input_json_schema,
+                ) for tool in tools
+            }
         self.name = name
         self.system_prompt = system_prompt
         self.generation_config = generation_config
         self.function_map = function_map
+        self.a_function_map = a_function_map
         self.termination_function = termination_function
         self.reduce_function = reduce_function
 
@@ -167,10 +178,11 @@ class Agent():
         tool_calls = messages[-1].content.tool_calls
         if tool_calls != None:
             tasks = [
-                get_coroutine(
-                    self.function_map.get(tool_call.function_call.name),
+                self.a_function_map.get(
+                    tool_call.function_call.name
+                )(
                     **json.loads(tool_call.function_call.arguments)
-                 ) for tool_call in tool_calls if tool_call.type == 'function'
+                ) for tool_call in tool_calls if tool_call.type == 'function'
             ]
 
             responses = await asyncio.gather(*tasks)
@@ -220,7 +232,7 @@ class Agent():
                     text=self.system_prompt
                 ),
             )] + messages
-            
+
         # determine the api_type
         if self.generation_config.api_type in ['openai', 'azure', 'fastchat']:
             message = await self.client.a_generate(
