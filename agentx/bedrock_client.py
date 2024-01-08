@@ -28,7 +28,7 @@ def swagger_to_xml(functions:List[Function])->str:
 
     pass
 
-def etree_to_dict(t) -> dict[str, Any]:
+def etree_to_dict(t) -> Dict[str, Any]:
     d = {t.tag: {}}
     children = list(t)
     if children:
