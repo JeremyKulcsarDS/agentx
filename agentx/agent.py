@@ -117,6 +117,14 @@ class Agent():
                             )
             return tool_responses + multimodal_responses
 
+        # add system prompt
+        if self.system_prompt != None:
+            messages = [Message(
+                role='system',
+                content=Content(
+                    text=self.system_prompt
+                ),
+            )] + messages
         # determine the api_type
         if self.generation_config.api_type in ['openai', 'azure', 'fastchat']:
             message = self.client.generate(
@@ -203,7 +211,16 @@ class Agent():
                         )
                     )
             return tool_responses + multimodal_responses
-    
+        
+        # add system prompt
+        if self.system_prompt != None:
+            messages = [Message(
+                role='system',
+                content=Content(
+                    text=self.system_prompt
+                ),
+            )] + messages
+            
         # determine the api_type
         if self.generation_config.api_type in ['openai', 'azure', 'fastchat']:
             message = await self.client.a_generate(

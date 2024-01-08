@@ -2,7 +2,7 @@ import openai
 from openai.types.chat import ChatCompletion, ChatCompletionMessageToolCall
 from typing import Dict, List, Callable, Optional, Union
 from pydantic import BaseModel
-from agentx.schema import Message, Content, ToolCall, FunctionCall, Function, GenerationConfig
+from agentx.schema import Message, Content, ToolCall, FunctionCall, GenerationConfig
 
 OEPNAI_API_KW = [
     'model',
