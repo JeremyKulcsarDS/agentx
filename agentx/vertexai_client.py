@@ -4,7 +4,7 @@ from google.oauth2 import service_account
 import aiohttp
 from typing import Coroutine, Callable, List, Dict, Optional, Union
 import requests
-from xentropy.schema import Message, Content, ToolCall, Function, GenerationConfig
+from agentx.schema import Message, Content, ToolCall, Function, GenerationConfig
 
 # UNDER DEVELOPMENT
 def transform_message_vertexai(message:Message) -> Dict:

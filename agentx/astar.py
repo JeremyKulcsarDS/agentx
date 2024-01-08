@@ -1,6 +1,6 @@
 import asyncio
 import queue
-from xentropy.agent import Agent, Message
+from agentx.agent import Agent, Message
 from typing import Callable, List, Union, Tuple, Dict
 
 

@@ -1,6 +1,6 @@
 from hashlib import sha256
 import uuid
-import xentropy.models
+import agentx.models
 import requests
 import aiohttp
 import os
@@ -69,7 +69,7 @@ class Tool():
                 filename = name.replace('--', '_')
                 with open(f'{path}/models/{filename}_{key}.py', 'w') as f:
                     f.write(value)
-                module = reload(xentropy.models)
+                module = reload(agentx.models)
                 submodule = getattr(module, f'{filename}_{key}')
                 model = getattr(submodule, to_camel_case(key))
                 setattr(tool, key, model)

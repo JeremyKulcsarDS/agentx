@@ -1,10 +1,10 @@
 import unittest
 import os
 from dotenv import load_dotenv
-from xentropy.schema import Message, Content, GenerationConfig
-from xentropy.oai_client import OAIClient
-from xentropy.vertexai_client import VertexAIClient
-from xentropy.bedrock_client import BedrockClient
+from agentx.schema import Message, Content, GenerationConfig
+from agentx.oai_client import OAIClient
+from agentx.vertexai_client import VertexAIClient
+from agentx.bedrock_client import BedrockClient
 
 load_dotenv()
 

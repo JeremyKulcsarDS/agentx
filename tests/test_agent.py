@@ -4,9 +4,9 @@ import unittest
 import os
 from pydantic import BaseModel
 from dotenv import load_dotenv
-from xentropy.schema import GenerationConfig, Message, Content, ToolCall, ToolResponse, Function
-from xentropy.agent import Agent
-from xentropy.utils import encode_image
+from agentx.schema import GenerationConfig, Message, Content, ToolCall, ToolResponse, Function
+from agentx.agent import Agent
+from agentx.utils import encode_image
 
 load_dotenv()
 

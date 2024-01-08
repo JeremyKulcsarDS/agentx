@@ -4,7 +4,7 @@ from typing import Any, Coroutine, Dict, List, Union
 from defusedxml import ElementTree
 import boto3
 from uuid import uuid4
-from xentropy.schema import Message, Content, ToolCall, Function, GenerationConfig
+from agentx.schema import Message, Content, ToolCall, Function, GenerationConfig
 
 # UNDER DEVELOPMENT
 

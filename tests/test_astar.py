@@ -1,9 +1,9 @@
 import unittest, os
 from dotenv import load_dotenv
-from xentropy.tool import Tool
-from xentropy.agent import Agent
-from xentropy.schema import GenerationConfig, Function, Message, Content
-from xentropy.astar import astarchat
+from agentx.tool import Tool
+from agentx.agent import Agent
+from agentx.schema import GenerationConfig, Function, Message, Content
+from agentx.astar import astarchat
 from pydantic import BaseModel, Field
 from typing import List
 

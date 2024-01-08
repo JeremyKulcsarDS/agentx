@@ -2,11 +2,11 @@ import asyncio
 import json
 from typing import Dict, List, Callable, Optional, Union
 from pydantic import BaseModel
-from xentropy.schema import Message, Content, ToolResponse, GenerationConfig, File
-import xentropy.oai_client
-import xentropy.vertexai_client
-import xentropy.bedrock_client
-from xentropy.utils import get_coroutine
+from agentx.schema import Message, Content, ToolResponse, GenerationConfig, File
+import agentx.oai_client
+import agentx.vertexai_client
+import agentx.bedrock_client
+from agentx.utils import get_coroutine
 
 class Agent():
     """
@@ -53,17 +53,17 @@ class Agent():
         self.reduce_function = reduce_function
 
         if self.generation_config.api_type in ['openai', 'fastchat', 'azure']:
-            self.client = xentropy.oai_client.OAIClient(
+            self.client = agentx.oai_client.OAIClient(
                 generation_config=self.generation_config
             )
 
         if self.generation_config.api_type == 'vertexai':
-            self.client = xentropy.vertexai_client.VertexAIClient(
+            self.client = agentx.vertexai_client.VertexAIClient(
                 generation_config=generation_config
             )
         
         if self.generation_config.api_type == 'bedrock':
-            self.client = xentropy.bedrock_client.BedrockClient()
+            self.client = agentx.bedrock_client.BedrockClient()
 
     def generate_response(self, messages:List[Message], output_model:Optional[BaseModel]=None) -> Union[None, Message, List[Message]]:
         """

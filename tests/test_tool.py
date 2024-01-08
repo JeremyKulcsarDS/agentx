@@ -1,7 +1,7 @@
 import unittest
 import os
 from dotenv import load_dotenv
-from xentropy.tool import Tool
+from agentx.tool import Tool
 from pydantic import BaseModel
 
 load_dotenv()

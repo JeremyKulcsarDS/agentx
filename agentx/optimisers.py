@@ -1,6 +1,6 @@
 import random
-from xentropy.schema import Message
-from xentropy.agent import Agent
+from agentx.schema import Message
+from agentx.agent import Agent
 from typing import Dict, List, Tuple, Callable, Union
 import copy
 from functools import reduce, partial
