@@ -45,6 +45,8 @@ class Agent():
         termination_function:Callable[[List[Message]], bool]=lambda x: False,
         reduce_function:Callable[[List[Message]], Message]=lambda x: x[-1],
     ):
+        function_map = None
+        a_function_map = None
         if tools != None:
             function_map = {tool.name: tool.run for tool in tools}
             a_function_map = {tool.name: tool.arun for tool in tools}
