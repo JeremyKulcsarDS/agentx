@@ -47,10 +47,11 @@ class Agent():
     ):
         function_map = None
         a_function_map = None
+        _generation_config = generation_config.model_copy(deep=True)
         if tools != None:
             function_map = {tool.name: tool.run for tool in tools}
             a_function_map = {tool.name: tool.arun for tool in tools}
-            generation_config.tools = {
+            _generation_config.tools = {
                 tool.name:Function(
                     name=tool.name,
                     description=tool.description,
@@ -59,7 +60,7 @@ class Agent():
             }
         self.name = name
         self.system_prompt = system_prompt
-        self.generation_config = generation_config
+        self.generation_config = _generation_config
         self.function_map = function_map
         self.a_function_map = a_function_map
         self.termination_function = termination_function
