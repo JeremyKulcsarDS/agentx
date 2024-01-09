@@ -132,7 +132,7 @@ async def astarchat(
                     )
                     return reconstructed_path, came_from, cost_so_far, heuristic_map, hash_map 
 
-    goal = heuristic_map[min(heuristic_map, key=heuristic_map.get)]
+    goal = min(heuristic_map, key=heuristic_map.get)
     reconstructed_path:List[Message] = reconstruct_path(
         came_from=came_from,
         goal=goal,
