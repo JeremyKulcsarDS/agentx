@@ -125,7 +125,7 @@ class Tool():
         self,
         *args,
         **kwargs
-    ):
+    ) -> str:
         url = f'https://api.xentropy.co/tool/{self.name}'
 
         # build headers
@@ -158,7 +158,7 @@ class Tool():
         self,
         *args,
         **kwargs,
-    ):
+    ) -> str:
         url = f'https://api.xentropy.co/tool/{self.name}'
 
         # build headers
