@@ -99,7 +99,7 @@ async def astarchat(
 
         for next in generated_messages:
             # calculate the cost of the new message
-            new_cost = cost_so_far[hash_map[tuple(current_messages[-1])]] + cost(flatten_current_messages, next)
+            new_cost:float = cost_so_far[hash_map[tuple(current_messages[-1])]] + cost(flatten_current_messages, next)
             hash_next_message = tuple([hash(message) for message in next])
             previous_cost = cost_so_far.get(hash_next_message, None)
             # the message is never seen before or the new cost is less than the previous cost
@@ -110,7 +110,7 @@ async def astarchat(
                 print(current_messages + [next])
                 heuristic_score = heuristic(flatten_current_messages + next)
                 heuristic_map[hash_next_message] = heuristic_score
-                priority = new_cost + heuristic_score
+                priority = int(new_cost + heuristic_score)
                 # Add the new message to the frontier
                 frontier.put((priority, current_messages + [next]))
                 came_from[hash_next_message] = hash_map[tuple(current_messages[-1])]
