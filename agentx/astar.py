@@ -2,6 +2,15 @@ import asyncio
 import queue
 from agentx.agent import Agent, Message
 from typing import Callable, List, Union, Tuple, Dict
+from pydantic import BaseModel
+
+class QueueItem(BaseModel):
+    priority:float
+    messages:List[List[Message]]
+
+    def __lt__(self, other):
+        return self.priority < other.priority
+    
 
 def reconstruct_path(
     came_from:Dict[Tuple[int], Union[Tuple[int], None]],
@@ -54,7 +63,7 @@ async def astarchat(
     frontier = queue.PriorityQueue(maxsize=max_queue_size)
 
     # Place first message to the frontier queue
-    frontier.put((0, [messages]))
+    frontier.put(QueueItem(priority=0, messages=[messages]))
 
     came_from: Dict[Tuple[int], Union[Tuple[int], None]] = {}
     cost_so_far: Dict[Tuple[int], float] = {}
@@ -72,7 +81,7 @@ async def astarchat(
     while (not frontier.empty()) and (current_iteration < max_iteration):
         current_iteration += 1
         # Pick the next list of messages for the conversation
-        current_messages: List[List[Message]] = frontier.get()[1]
+        current_messages: List[List[Message]] = frontier.get().messages
         flatten_current_messages: List[Message] = [message for sublist in current_messages for message in sublist]
         
         # Generate a list of responses from the participating agents
@@ -107,12 +116,14 @@ async def astarchat(
                 cost_so_far[hash_next_message] = new_cost
                 hash_map[hash_next_message] = tuple(next)
                 hash_map[tuple(next)] = hash_next_message
-                print(current_messages + [next])
                 heuristic_score = heuristic(flatten_current_messages + next)
                 heuristic_map[hash_next_message] = heuristic_score
                 priority = int(new_cost + heuristic_score)
                 # Add the new message to the frontier
-                frontier.put((priority, current_messages + [next]))
+                print(new_cost)
+                print(heuristic_score)
+                print((priority, current_messages + [next]))
+                frontier.put(QueueItem(priority=priority, messages=current_messages + [next]))
                 came_from[hash_next_message] = hash_map[tuple(current_messages[-1])]
                 if heuristic_score < threshold:
                     reconstructed_path:List[Message] = reconstruct_path(
