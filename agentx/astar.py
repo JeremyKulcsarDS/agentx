@@ -118,12 +118,11 @@ async def astarchat(
                 hash_map[tuple(next)] = hash_next_message
                 heuristic_score = heuristic(flatten_current_messages + next)
                 heuristic_map[hash_next_message] = heuristic_score
-                priority = int(new_cost + heuristic_score)
-                # Add the new message to the frontier
-                print(new_cost)
-                print(heuristic_score)
-                print((priority, current_messages + [next]))
-                frontier.put(QueueItem(priority=priority, messages=current_messages + [next]))
+                priority = new_cost + heuristic_score
+                # Add the new item to the frontier
+                new_item = QueueItem(priority=priority, messages=current_messages + [next])
+                print(new_item)
+                frontier.put(new_item)
                 came_from[hash_next_message] = hash_map[tuple(current_messages[-1])]
                 if heuristic_score < threshold:
                     reconstructed_path:List[Message] = reconstruct_path(
