@@ -14,9 +14,9 @@ class Agent():
     
     Attributes:
         name (str): The name of the agent.
-        system_prompt (str): The system prompt to be used during generation.
         generation_config (GenerationConfig): The configuration for text generation.
-        function_map (Dict[str, Callable]): A dictionary mapping function names to their corresponding callable objects.
+        system_prompt (Optional[str]): The system prompt to be used during generation.
+        tools (Optional[List[Tool]]): A dictionary of tools that the agent can use.
         terminate_function (Callable[[List[Message]], bool]): A function that determines the termination criteria for generation.
         reduce_function (Callable[[List[Message]], Message]): A function that reduces a list of messages into a single message. Useful for running self-consistency algorithms to improve performance.
 
@@ -39,8 +39,8 @@ class Agent():
     def __init__(
         self,
         name:str,
+        generation_config:GenerationConfig,
         system_prompt:Optional[str]=None,
-        generation_config:GenerationConfig=None,
         tools:Optional[List[Tool]]=None,
         termination_function:Callable[[List[Message]], bool]=lambda x: False,
         reduce_function:Callable[[List[Message]], Message]=lambda x: x[-1],
