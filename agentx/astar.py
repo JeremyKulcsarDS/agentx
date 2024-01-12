@@ -35,7 +35,6 @@ async def astarchat(
         threshold: int=10,
         n_replies: int=1,
         max_iteration:int=10,
-        max_queue_size:int=10,
 ) -> Tuple[
         List[Message], 
         Dict[Tuple[int], Union[Tuple[int], None]], 
@@ -56,12 +55,8 @@ async def astarchat(
     :param max_iteration: Terminate the search after max_try iterations
     :param max_queue_size: Maximum size of the frontier priority queue
     """
-
-    # Number of turns in the conversation
-    current_iteration = 0
-
     # Initialize the frontier queue
-    frontier = queue.PriorityQueue(maxsize=max_queue_size)
+    frontier = queue.PriorityQueue()
 
     # Place first message to the frontier queue
     frontier.put(QueueItem(priority=0, messages=[messages]))
