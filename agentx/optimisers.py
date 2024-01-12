@@ -1,6 +1,5 @@
 import random
 import copy
-import asyncio
 from agentx.schema import Message
 from agentx.agent import Agent
 from typing import Dict, List, Tuple, Callable, Union, Any
@@ -14,7 +13,6 @@ class TextualGradientPromptTrainer():
         agent: Agent,
         target: str,
         output_model:Union[BaseModel, None],
-        textual_loss_function: Callable[..., str],
         textual_gradient: Callable[[str, Union[List[Message], List[List[Message]]], Message], Message],
         step_function: Callable[[str, Message], List[Message]],
         paraphrase_function: Callable[[Message], List[Message]],
@@ -31,7 +29,6 @@ class TextualGradientPromptTrainer():
         self.agent = agent
         self.target = target
         self.output_model = output_model
-        self.textual_loss_function = textual_loss_function
         self.textual_gradient = textual_gradient
         self.step_function = step_function
         self.paraphrase_function = paraphrase_function
@@ -41,6 +38,10 @@ class TextualGradientPromptTrainer():
         self.batch_size = batch_size
         self.n_beam = n_beam
 
+    def generate(self, agent:Agent, messages:List[Message], output_model:Union[BaseModel, None]):
+        response = agent.generate_response(messages=messages, output_model=output_model)
+        return output_model.model_validate(response.content.text) if output_model else response
+    
     def expand(
         self,
         prompt:str,
@@ -56,14 +57,15 @@ class TextualGradientPromptTrainer():
 
         # generate responses for each data point
         responses = [
-            _agent.generate_response(messages=datum, output_model=self.output_model) for datum in x
+            self.generate(
+                agent=_agent,
+                messages=datum,
+                output_model=self.output_model
+            ) for datum in x
         ]
 
-        # aggregate responses (x, y) into a single textual loss
-        textual_loss = self.textual_loss_function(responses, [datum for datum in y])
-
-        # calculate the textual gradient
-        textual_gradient = self.textual_gradient(prompt, responses, textual_loss)
+        # calculate the textual gradient, i.e. identify problems which the agent made mistakes on
+        textual_gradient = self.textual_gradient(prompt, responses, y)
 
         # generate new prompts based on the textual gradient
         new_prompts = self.step_function(prompt, textual_gradient)

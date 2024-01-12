@@ -294,7 +294,7 @@ class OAIClient():
                 messages=[transform_message_openai(message) for message in messages],
                 **kw_args
             )
-        
+
             generated_messages = [choice.message for choice in response.choices]
 
             for message in generated_messages:
@@ -341,7 +341,7 @@ class OAIClient():
 
             num_retry += 1
         
-        if reduce_function:
+        if reduce_function and len(_messages) > 0:
             return reduce_function(_messages)
         else:
             return _messages
