@@ -1,10 +1,11 @@
 import random
+import copy
+import asyncio
 from agentx.schema import Message
 from agentx.agent import Agent
-from typing import Dict, List, Tuple, Callable, Union
-import copy
+from typing import Dict, List, Tuple, Callable, Union, Any
 from functools import reduce, partial
-
+from math import ceil
 
 class TextualGradientPromptTrainer():
     def __init__(
@@ -104,7 +105,6 @@ class TextualGradientPromptTrainer():
         # implement successive rejects
         K = len(prompts) - self.n_beam
         log_bar_K = 0.5 + sum([1.0/i for i in range(2, K+1)])
-        prev_n_k = 0
 
         scores = {
             prompt:0 for prompt in prompts
@@ -115,7 +115,7 @@ class TextualGradientPromptTrainer():
         for i in range(K):
             # calculate the number of samples for the current round
             n_k = (1.0 / log_bar_K) * ((self.budget - K) / (K - i))
-            n_samples_per_round = int(n_k - prev_n_k)
+            n_samples_per_round = ceil(n_k)
             prev_n_k = n_k
             # impose a maximum number of samples per round
             n_samples_per_round = max(self.max_sample, n_samples_per_round)
@@ -154,14 +154,4 @@ class TextualGradientPromptTrainer():
             prompts = prompts_remained
         
         return prompts, scores_log
-
-class InferenceParameterOptimiser():
-    def __init__(
-        self,
-        agent: Agent,
-        messages: List[Message],
-        data: List[Tuple[Message, Message]],
-    ):
-        self.agent = agent
-        self.messages = messages
-        self.data = data
+    
