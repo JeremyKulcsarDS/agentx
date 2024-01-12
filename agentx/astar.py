@@ -72,6 +72,7 @@ async def astarchat(
     first_hash = tuple([hash(message) for message in messages])
     came_from[first_hash] = None
     cost_so_far[first_hash] = 0
+    heuristic_map[first_hash] = heuristic(messages)
 
     hash_map: Dict[Union[Tuple[int], Tuple[Message]], Union[Tuple[int], Tuple[Message]]] = {
         first_hash: tuple(messages),
