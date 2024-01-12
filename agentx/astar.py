@@ -3,6 +3,7 @@ import queue
 from agentx.agent import Agent, Message
 from typing import Callable, List, Union, Tuple, Dict
 from pydantic import BaseModel
+from tqdm import tqdm
 
 class QueueItem(BaseModel):
     priority:float
@@ -30,7 +31,7 @@ async def astarchat(
         agents: List[Agent],
         messages: List[Message],
         cost: Callable[[List[Message]], float],
-        heuristic: Callable[[List[Message]], float],
+        heuristic: Callable[[List[Message]], Union[float, None]],
         threshold: int=10,
         n_replies: int=1,
         max_iteration:int=10,
@@ -79,8 +80,9 @@ async def astarchat(
         tuple(messages): first_hash,
     }
 
-    while (not frontier.empty()) and (current_iteration < max_iteration):
-        current_iteration += 1
+    for current_iteration in tqdm(range(max_iteration)):
+        if frontier.empty():
+            break
         # Pick the next list of messages for the conversation
         current_messages: List[List[Message]] = frontier.get().messages
         flatten_current_messages: List[Message] = [message for sublist in current_messages for message in sublist]
@@ -119,7 +121,7 @@ async def astarchat(
                 hash_map[hash_next_message] = tuple(next)
                 hash_map[tuple(next)] = hash_next_message
                 heuristic_score = heuristic(flatten_current_messages + next)
-                # when heuristic score is None, use the heuristic score of the previous message
+                # if heuristic score is None, use the heuristic score of the previous message
                 if heuristic_score == None:
                     heuristic_score = heuristic_map[hash_map[tuple(current_messages[-1])]]
                 heuristic_map[hash_next_message] = heuristic_score

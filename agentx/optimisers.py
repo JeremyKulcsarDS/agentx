@@ -13,7 +13,7 @@ class TextualGradientPromptTrainer():
         self,
         agent: Agent,
         target: str,
-        output_model:BaseModel,
+        output_model:Union[BaseModel, None],
         textual_loss_function: Callable[..., str],
         textual_gradient: Callable[[str, Union[List[Message], List[List[Message]]], Message], Message],
         step_function: Callable[[str, Message], List[Message]],
@@ -30,6 +30,7 @@ class TextualGradientPromptTrainer():
         """
         self.agent = agent
         self.target = target
+        self.output_model = output_model
         self.textual_loss_function = textual_loss_function
         self.textual_gradient = textual_gradient
         self.step_function = step_function
@@ -55,7 +56,7 @@ class TextualGradientPromptTrainer():
 
         # generate responses for each data point
         responses = [
-            _agent.generate_response(messages=datum) for datum in x
+            _agent.generate_response(messages=datum, output_model=self.output_model) for datum in x
         ]
 
         # aggregate responses (x, y) into a single textual loss
@@ -90,7 +91,7 @@ class TextualGradientPromptTrainer():
         
         # generate responses for each data point
         responses = [
-            _agent.generate_response(messages=datum) for datum in x
+            _agent.generate_response(messages=datum, output_model=self.output_model) for datum in x
         ]
 
         metric = sum(
@@ -118,9 +119,8 @@ class TextualGradientPromptTrainer():
 
         for i in range(K):
             # calculate the number of samples for the current round
-            n_k = (1.0 / log_bar_K) * ((self.budget - K) / (K - i))
+            n_k = ((self.budget - K) / (K - i)) / log_bar_K
             n_samples_per_round = ceil(n_k)
-            prev_n_k = n_k
             # impose a maximum number of samples per round
             n_samples_per_round = max(self.max_sample, n_samples_per_round)
             # sample data
@@ -136,7 +136,8 @@ class TextualGradientPromptTrainer():
 
     def fit(
         self,
-        data:List[Tuple[List[Message], Union[Message, List[Message]]]], 
+        x:List[List[Message]],
+        y:List,
         n_training_steps:int, 
         initial_prompts:Union[List[str], None]
     ) -> Tuple[List[str], Dict[str, float]]:
@@ -150,10 +151,10 @@ class TextualGradientPromptTrainer():
 
         scores_log = []
         for i in range(n_training_steps):
-            expand = partial(self.expand, data=data)
+            expand = partial(self.expand, x=x, y=y)
             prompts = reduce(lambda a, b: a + expand(b), prompts, [])
             # select
-            prompts_remained, scores = self.select(prompts, data)
+            prompts_remained, scores = self.select(prompts, x=x, y=y)
             scores_log.append(scores)
             prompts = prompts_remained
         
