@@ -6,17 +6,19 @@ from agentx.agent import Agent
 from typing import Dict, List, Tuple, Callable, Union, Any
 from functools import reduce, partial
 from math import ceil
+from pydantic import BaseModel
 
 class TextualGradientPromptTrainer():
     def __init__(
         self,
         agent: Agent,
         target: str,
-        textual_loss_function: Callable[[Union[List[Message], List[List[Message]]], Union[List[Message], List[List[Message]]]], Message],
+        output_model:BaseModel,
+        textual_loss_function: Callable[..., str],
         textual_gradient: Callable[[str, Union[List[Message], List[List[Message]]], Message], Message],
         step_function: Callable[[str, Message], List[Message]],
         paraphrase_function: Callable[[Message], List[Message]],
-        selection_metric: Callable[[Union[List[Message], List[List[Message]]], Union[List[Message], List[List[Message]]]], float],
+        selection_metric: Callable[[Union[List[Message], List[List[Message]]], Any], float],
         n_beam: int = 5,
         batch_size: int = 5,
         max_sample: int = 5,
@@ -41,7 +43,8 @@ class TextualGradientPromptTrainer():
     def expand(
         self,
         prompt:str,
-        data:List[Tuple[List[Message], Union[Message, List[Message]]]]
+        x:List[List[Message]],
+        y:List,
     ) -> List[str]:
 
         _agent = copy.deepcopy(self.agent)
@@ -52,11 +55,11 @@ class TextualGradientPromptTrainer():
 
         # generate responses for each data point
         responses = [
-            _agent.generate_response(messages=datum[0]) for datum in data
+            _agent.generate_response(messages=datum) for datum in x
         ]
 
         # aggregate responses (x, y) into a single textual loss
-        textual_loss = self.textual_loss_function(responses, [datum[1] for datum in data])
+        textual_loss = self.textual_loss_function(responses, [datum for datum in y])
 
         # calculate the textual gradient
         textual_gradient = self.textual_gradient(prompt, responses, textual_loss)
@@ -76,7 +79,8 @@ class TextualGradientPromptTrainer():
     def compute_metric(
         self,
         prompt:str,
-        data:List[Tuple[List[Message], Union[Message, List[Message]]]]
+        x:List[List[Message]],
+        y:List,
     ) -> float:
         _agent = copy.deepcopy(self.agent)
         if self.target == 'agent':
@@ -86,12 +90,12 @@ class TextualGradientPromptTrainer():
         
         # generate responses for each data point
         responses = [
-            _agent.generate_response(messages=datum[0]) for datum in data
+            _agent.generate_response(messages=datum) for datum in x
         ]
 
         metric = sum(
-                [
-                self.selection_metric(response, datum[1]) for response, datum in zip(responses, data)
+            [
+                self.selection_metric(response, datum) for response, datum in zip(responses, y)
             ]
         )
 

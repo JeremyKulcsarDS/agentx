@@ -118,6 +118,9 @@ async def astarchat(
                 hash_map[hash_next_message] = tuple(next)
                 hash_map[tuple(next)] = hash_next_message
                 heuristic_score = heuristic(flatten_current_messages + next)
+                # when heuristic score is None, use the heuristic score of the previous message
+                if heuristic_score == None:
+                    heuristic_score = heuristic_map[hash_map[tuple(current_messages[-1])]]
                 heuristic_map[hash_next_message] = heuristic_score
                 priority = new_cost + heuristic_score
 
