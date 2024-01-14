@@ -174,10 +174,6 @@ class OAIClient():
                 )
             )
             kw_args['response_format'] = {'type':'json_object'}
-        
-        _messages = []
-
-        num_retry = 0
 
         if generation_config.tools != None:
             kw_args['tools'] = [
@@ -190,7 +186,9 @@ class OAIClient():
         if generation_config.api_type == 'azure':
             kw_args['model'] = generation_config.azure_deployment
 
-        while num_retry < generation_config.max_retries:
+        _messages = []
+
+        for num_retry in range(generation_config.max_retries):
             response:ChatCompletion = self.client.chat.completions.create(
                 messages=[transform_message_openai(message) for message in messages],
                 **kw_args
@@ -238,13 +236,13 @@ class OAIClient():
                             content=content,
                         )
                     )
-            
+
             if len(_messages) >= generation_config.n_candidates:
                 _messages = _messages[:generation_config.n_candidates]
                 break
 
-            num_retry += 1
-
+        if len(_messages) == 0:
+            return None
         if reduce_function:
             return reduce_function(_messages)
         else:
@@ -273,10 +271,6 @@ class OAIClient():
                 )
             )
             kw_args['response_format'] = {'type':'json_object'}
-        
-        _messages = []
-
-        num_retry = 0
 
         if generation_config.tools != None:
             kw_args['tools'] = [
@@ -289,7 +283,9 @@ class OAIClient():
         if generation_config.api_type == 'azure':
             kw_args['model'] = generation_config.azure_deployment
 
-        while num_retry < generation_config.max_retries:
+        _messages = []
+
+        for num_retry in range(generation_config.max_retries):
             response = await self.a_client.chat.completions.create(
                 messages=[transform_message_openai(message) for message in messages],
                 **kw_args
@@ -334,14 +330,14 @@ class OAIClient():
                             content=content,
                         )
                     )
-            
+
             if len(_messages) >= generation_config.n_candidates:
                 _messages = _messages[:generation_config.n_candidates]
                 break
-
-            num_retry += 1
         
-        if reduce_function and len(_messages) > 0:
+        if len(_messages) == 0:
+            return None
+        if reduce_function:
             return reduce_function(_messages)
         else:
             return _messages
