@@ -136,6 +136,7 @@ class Agent():
                 content=Content(
                     text=self.system_prompt
                 ),
+                name=self.name,
             )] + messages
         # determine the api_type
         if self.generation_config.api_type in ['openai', 'azure', 'fastchat']:
@@ -164,7 +165,11 @@ class Agent():
                 output_model=output_model,
             )
 
-        message.name = self.name
+        if isinstance(message, List):
+            for m in message:
+                m.name = self.name
+        else:
+            message.name = self.name
         return message
 
     async def a_generate_response(self, messages:List[Message], output_model:Optional[BaseModel]=None) -> Union[None, Message,List[Message]]:
@@ -232,6 +237,7 @@ class Agent():
                 content=Content(
                     text=self.system_prompt
                 ),
+                name=self.name,
             )] + messages
 
         # determine the api_type
@@ -260,6 +266,10 @@ class Agent():
                 reduce_function=self.reduce_function,
                 output_model=output_model,
             )
-            
-        message.name = self.name
+
+        if isinstance(message, List):
+            for m in message:
+                m.name = self.name
+        else:
+            message.name = self.name
         return message
