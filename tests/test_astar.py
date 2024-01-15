@@ -3,7 +3,7 @@ from dotenv import load_dotenv
 from agentx.tool import Tool
 from agentx.agent import Agent
 from agentx.schema import GenerationConfig, Function, Message, Content
-from agentx.astar import astarchat
+from agentx.groupchat import astarchat
 from pydantic import BaseModel, Field
 from typing import List
 

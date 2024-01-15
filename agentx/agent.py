@@ -46,7 +46,7 @@ class Agent():
         reduce_function:Callable[[List[Message]], Message]=lambda x: x[-1],
     ):
         function_map = {tool.name: tool.run for tool in tools} if tools != None else {}
-        a_function_map = {tool.name: tool.arun for tool in tools} if tools != None else {}
+        a_function_map = {tool.name: tool.a_run for tool in tools} if tools != None else {}
         _generation_config = generation_config.model_copy(deep=True)
         if tools != None:
             _generation_config.tools = {

@@ -1,4 +1,5 @@
 import asyncio
+from copy import deepcopy
 import queue
 from agentx.agent import Agent, Message
 from typing import Callable, List, Union, Tuple, Dict
@@ -27,14 +28,15 @@ def reconstruct_path(
     path.reverse()
     return path
 
-async def astarchat(
-        agents: List[Agent],
-        messages: List[Message],
-        cost: Callable[[List[Message]], float],
-        heuristic: Callable[[List[Message]], Union[float, None]],
-        threshold: int=10,
-        n_replies: int=1,
-        max_iteration:int=10,
+
+async def astar_chat(
+    agents: List[Agent],
+    messages: List[Message],
+    cost: Callable[[List[Message]], float],
+    heuristic: Callable[[List[Message]], Union[float, None]],
+    threshold: int=10,
+    n_replies: int=1,
+    max_iteration:int=10,
 ) -> Tuple[
         List[Message], 
         Dict[Tuple[int], Union[Tuple[int], None]], 
@@ -43,7 +45,8 @@ async def astarchat(
         Dict[Union[Tuple[int], Tuple[Message]], Union[Tuple[int], Tuple[Message]]]
     ]:
     """
-    Start the chat, with the first agent initiating the conversation
+    The agents will concurrently generate a response to the messages.
+    The best response will be selected based on the heuristic function.
 
     :param agents: List of agents participating in the conversation
     :param messages: List of messages to start the conversation
@@ -143,3 +146,50 @@ async def astarchat(
 
     return reconstructed_path, came_from, cost_so_far, heuristic_map, hash_map
 
+
+async def group_chat(
+    agents: List[Agent],
+    messages: List[Message],
+    heuristic: Callable[[List[Message]], Union[float, None]],
+    threshold: int=10,
+    max_iteration:int=10,
+):
+    '''
+    Start the chat, with the first agent initiating the conversation.
+    Each agent in the agents list will take turn in a roundtable to generate a response to the messages.
+    '''
+    current_messages = deepcopy(messages)
+    first_hash = tuple([hash(message) for message in messages])
+    heuristic_map: Dict[Tuple[int], float] = {first_hash:heuristic(messages)}
+    hash_map: Dict[Union[Tuple[int], Tuple[Message]], Union[Tuple[int], Tuple[Message]]] = {
+        first_hash: tuple(messages),
+        tuple(messages): first_hash,
+    }
+
+    for current_iteration in range(max_iteration):
+        # Pick the next agent to generate a response
+        agent = agents[current_iteration % len(agents)]
+        # Generate a response from the agent
+        response:Message = await agent.a_generate_response(current_messages)
+        # if the response is a tool_call
+        tool_call = response.content.tool_calls
+        tool_response:Union[List[Message], None] = None
+        if tool_call != None:
+            # execute the tool call
+            tool_response:List[Message] = await agent.a_generate_response(current_messages)
+        
+        next = [response] + tool_response if tool_response != None else []
+        hash_next_message = tuple([hash(message) for message in next])
+        hash_map[hash_next_message] = tuple(next)
+        hash_map[tuple(next)] = hash_next_message
+        # Check if the conversation is finished
+        heuristic_score = heuristic(current_messages + next)
+        # if heuristic score is None, use the heuristic score of the previous message
+        if heuristic_score == None:
+            heuristic_score = heuristic_map[hash_map[tuple(current_messages[-1])]]
+            heuristic_map[hash_next_message] = heuristic_score
+        
+        if heuristic_score < threshold:
+            return current_messages.extend(next), heuristic_map, hash_map
+    
+    return current_messages, heuristic_map, hash_map

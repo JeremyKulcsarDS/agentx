@@ -154,7 +154,7 @@ class Tool():
 
         return response.get('response')
 
-    async def arun(
+    async def a_run(
         self,
         *args,
         **kwargs,
