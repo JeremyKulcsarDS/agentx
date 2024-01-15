@@ -295,6 +295,10 @@ class OAIClient():
 
             for message in generated_messages:
                 if message.tool_calls != None:
+                    # sometimes the tool calls returned is not in the documented schema
+                    if message.tool_calls[0].function.name == 'parallel':
+                        continue
+                    
                     content = Content(
                         tool_calls=[
                             ToolCall(

@@ -94,26 +94,25 @@ async def astar_chat(
         # Flatten the list of tasks
         tasks = [item for sublist in tasks for item in sublist]
 
-        generated_messages:List[Union[Message, List[Message], None]] = await asyncio.gather(*tasks)
-        generated_messages:List[Union[Message, List[Message]]] = [message for message in generated_messages if message != None]
-        generated_messages:List[List[Message]] = [message if isinstance(message, List) else [message] for message in generated_messages]
+        generated_messages:List[Union[List[Message], None]] = await asyncio.gather(*tasks)
+        generated_messages:List[List[Message]] = [message for message in generated_messages if message != None]
 
         for next in generated_messages:
             # calculate the cost of the new message
             new_cost:float = cost_so_far[hash_map[tuple(current_messages[-1])]] + cost(flatten_current_messages, next)
-            hash_next_message = tuple([hash(message) for message in next])
-            previous_cost = cost_so_far.get(hash_next_message, None)
+            hash_next_messages = tuple([hash(message) for message in next])
+            previous_cost = cost_so_far.get(hash_next_messages, None)
             # the message is never seen before or the new cost is less than the previous cost
             if previous_cost == None or new_cost < previous_cost:
-                cost_so_far[hash_next_message] = new_cost
-                came_from[hash_next_message] = hash_map[tuple(current_messages[-1])]
-                hash_map[hash_next_message] = tuple(next)
-                hash_map[tuple(next)] = hash_next_message
+                cost_so_far[hash_next_messages] = new_cost
+                came_from[hash_next_messages] = hash_map[tuple(current_messages[-1])]
+                hash_map[hash_next_messages] = tuple(next)
+                hash_map[tuple(next)] = hash_next_messages
                 heuristic_score = heuristic(flatten_current_messages + next)
                 # if heuristic score is None, use the heuristic score of the previous message
                 if heuristic_score == None:
                     heuristic_score = heuristic_map[hash_map[tuple(current_messages[-1])]]
-                heuristic_map[hash_next_message] = heuristic_score
+                heuristic_map[hash_next_messages] = heuristic_score
                 priority = new_cost + heuristic_score
 
                 # Add the new item to the frontier
@@ -123,7 +122,7 @@ async def astar_chat(
                 if heuristic_score < threshold:
                     reconstructed_path:List[Message] = reconstruct_path(
                         came_from=came_from,
-                        goal=hash_next_message,
+                        goal=hash_next_messages,
                         hash_map=hash_map
                     )
                     return reconstructed_path, came_from, cost_so_far, heuristic_map, hash_map 
@@ -141,7 +140,7 @@ async def astar_chat(
 async def group_chat(
     agents: List[Agent],
     messages: List[Message],
-    heuristic: Callable[[List[Message]], Union[float, None]],
+    heuristic: Callable[[List[Message]], Union[float, None]]=lambda x: None,
     threshold: int=10,
     max_iteration:int=10,
 ):
@@ -149,34 +148,21 @@ async def group_chat(
     Start the chat, with the first agent initiating the conversation.
     Each agent in the agents list will take turn in a roundtable to generate a response to the messages.
     '''
-    current_messages = deepcopy(messages)
-    first_hash = tuple([hash(message) for message in messages])
-    heuristic_map: Dict[Tuple[int], float] = {first_hash:heuristic(messages)}
-    hash_map: Dict[Union[Tuple[int], Tuple[Message]], Union[Tuple[int], Tuple[Message]]] = {
-        first_hash: tuple(messages),
-        tuple(messages): first_hash,
-    }
+
+    heuristic_map: Dict[Message, float] = {}
 
     for current_iteration in range(max_iteration):
         # Pick the next agent to generate a response
         agent = agents[current_iteration % len(agents)]
         # Generate a response from the agent
-        response = await agent.a_generate_response(current_messages)
-        
-        next = [response] if isinstance(response, Message) else response
+        response = await agent.a_generate_response(messages)
 
-        hash_next_message = tuple([hash(message) for message in next])
-        hash_map[hash_next_message] = tuple(next)
-        hash_map[tuple(next)] = hash_next_message
-
-        heuristic_score = heuristic(current_messages + next)
-        # if heuristic score is None, use the heuristic score of the previous message
-        if heuristic_score == None:
-            heuristic_score = heuristic_map[hash_map[tuple(current_messages[-1])]]
-            heuristic_map[hash_next_message] = heuristic_score
+        heuristic_score = heuristic(messages + response)
+        heuristic_map.update({message:heuristic_score for message in response})
         
+        messages.extend(response)
         # if heuristic score is less than the threshold, terminate the chat
-        if heuristic_score < threshold:
-            return current_messages.extend(next), heuristic_map, hash_map
-    
-    return current_messages, heuristic_map, hash_map
+        if heuristic and heuristic_score < threshold:
+            return messages, heuristic_map
+
+    return messages, heuristic_map

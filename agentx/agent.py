@@ -1,4 +1,5 @@
 import asyncio
+from copy import deepcopy
 import json
 from typing import Dict, List, Callable, Optional, Union
 from pydantic import BaseModel
@@ -89,18 +90,19 @@ class Agent():
         if self.termination_function(messages):
             return None
 
+        _messages = deepcopy(messages)
         # add system prompt
         if self.system_prompt != None:
-            messages = [Message(
+            _messages = [Message(
                 role='system',
                 content=Content(
                     text=self.system_prompt
                 ),
                 name=self.name,
-            )] + messages
+            )] + _messages
 
         message:Message = self.client.generate(
-            messages=messages,
+            messages=_messages,
             generation_config=self.generation_config,
             reduce_function=self.reduce_function,
             output_model=output_model,
@@ -155,7 +157,7 @@ class Agent():
             generated_messages += tool_responses + multimodal_responses
 
             second_message:Message = self.client.generate(
-                messages=messages + generated_messages,
+                messages=_messages + generated_messages,
                 generation_config=self.generation_config,
                 reduce_function=self.reduce_function,
                 output_model=output_model,
@@ -178,19 +180,20 @@ class Agent():
         if self.termination_function(messages):
             return None
         
+        _messages = deepcopy(messages)
+
         # add system prompt
         if self.system_prompt != None:
-            messages = [Message(
+            _messages = [Message(
                 role='system',
                 content=Content(
                     text=self.system_prompt
                 ),
                 name=self.name,
-            )] + messages
-
+            )] + _messages
 
         message:Message = await self.client.a_generate(
-            messages=messages,
+            messages=_messages,
             generation_config=self.generation_config,
             reduce_function=self.reduce_function,
             output_model=output_model,
@@ -201,7 +204,7 @@ class Agent():
         # tool calls
         tool_calls = generated_messages[-1].content.tool_calls
 
-        while tool_calls != None:        
+        while tool_calls != None:
             tasks = [
                 self.a_function_map.get(
                     tool_call.function_call.name
