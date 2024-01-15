@@ -85,20 +85,11 @@ async def astar_chat(
         current_messages: List[List[Message]] = frontier.get().messages
         flatten_current_messages: List[Message] = [message for sublist in current_messages for message in sublist]
         
-        # Generate a list of responses from the participating agents
-        participating_agents = agents
-
-        tool_calls = flatten_current_messages[-1].content.tool_calls
-        if tool_calls != None:
-            function_names = [tool_call.function_call.name for tool_call in tool_calls]
-            participating_agents = [
-                agent for agent in agents if set(function_names).issubset(agent.a_function_map.keys())
-            ]
-        
+        # For each agent generate n_replies responses
         tasks = [
             [
                 agent.a_generate_response(flatten_current_messages) for i in range(n_replies)
-            ] for agent in participating_agents
+            ] for agent in agents
         ]
         # Flatten the list of tasks
         tasks = [item for sublist in tasks for item in sublist]
@@ -170,25 +161,21 @@ async def group_chat(
         # Pick the next agent to generate a response
         agent = agents[current_iteration % len(agents)]
         # Generate a response from the agent
-        response:Message = await agent.a_generate_response(current_messages)
-        # if the response is a tool_call
-        tool_call = response.content.tool_calls
-        tool_response:Union[List[Message], None] = None
-        if tool_call != None:
-            # execute the tool call
-            tool_response:List[Message] = await agent.a_generate_response(current_messages)
+        response = await agent.a_generate_response(current_messages)
         
-        next = [response] + tool_response if tool_response != None else []
+        next = [response] if isinstance(response, Message) else response
+
         hash_next_message = tuple([hash(message) for message in next])
         hash_map[hash_next_message] = tuple(next)
         hash_map[tuple(next)] = hash_next_message
-        # Check if the conversation is finished
+
         heuristic_score = heuristic(current_messages + next)
         # if heuristic score is None, use the heuristic score of the previous message
         if heuristic_score == None:
             heuristic_score = heuristic_map[hash_map[tuple(current_messages[-1])]]
             heuristic_map[hash_next_message] = heuristic_score
         
+        # if heuristic score is less than the threshold, terminate the chat
         if heuristic_score < threshold:
             return current_messages.extend(next), heuristic_map, hash_map
     

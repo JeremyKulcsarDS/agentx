@@ -158,7 +158,7 @@ class OAIClient():
             generation_config: GenerationConfig,
             reduce_function: Optional[Callable[[List[Message]], Message]]=None,
             output_model:BaseModel = None,
-    ) -> Union[Message, List[Message]]:
+    ) -> Union[Message, List[Message], None]:
         # call the openai api
         kw_args = {key:value for key, value in generation_config.model_dump().items() if value != None and key in OEPNAI_API_KW}
 
@@ -254,7 +254,7 @@ class OAIClient():
         generation_config: GenerationConfig,
         reduce_function: Optional[Callable[[List[Message]], Message]]=None,
         output_model:BaseModel = None
-    ) -> Union[Message, List[Message]]:
+    ) -> Union[Message, List[Message], None]:
         # call the openai api
 
         kw_args = {key:value for key, value in generation_config.model_dump().items() if value != None and key in OEPNAI_API_KW}

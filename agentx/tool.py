@@ -44,6 +44,11 @@ class Tool():
         self.free_quota: Optional[int] = kwargs.get('free_quota')
         self.endpoint: Optional[AnyHttpUrl] = kwargs.get('endpoint')
 
+        if self.input_model != None:
+            self.input_json_schema = self.input_model.model_json_schema()
+        if self.output_model != None:
+            self.output_json_schema = self.output_model.model_json_schema()
+
     @classmethod
     def load(cls, name, api_key):
         tool = Tool(api_key=api_key, name=name)
@@ -140,7 +145,7 @@ class Tool():
 
         resp = requests.post(
             url,
-            data=bytes(model.json(), 'utf-8'),
+            data=bytes(model.model_dump_json(), 'utf-8'),
             headers=headers,
         )
 
@@ -174,7 +179,7 @@ class Tool():
 
         # use the tool asynchronously
         async with aiohttp.ClientSession() as session:
-            async with session.post(url, data=bytes(model.json(), 'utf-8'), headers=headers) as resp:
+            async with session.post(url, data=bytes(model.model_dump_json(), 'utf-8'), headers=headers) as resp:
 
                 if resp.status >= 300:
                     raise Exception(await resp.text())
