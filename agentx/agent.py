@@ -81,7 +81,7 @@ class Agent():
         self,
         messages:List[Message],
         output_model:Optional[BaseModel]=None
-    ) -> Union[None, Message, List[Message]]:
+    ) -> Union[None, List[Message]]:
         """
         Generate a response to the given messages based on the generation config
         """
@@ -99,116 +99,78 @@ class Agent():
                 name=self.name,
             )] + messages
 
-        # determine the api_type
-        if self.generation_config.api_type in ['openai', 'azure', 'fastchat']:
-            message = self.client.generate(
-                messages=messages,
-                generation_config=self.generation_config,
-                reduce_function=self.reduce_function,
-                output_model=output_model,
-            )
-        
-        if self.generation_config.api_type == 'vertexai':
-            # call the vertex api
-            message = self.client.generate(
-                messages=messages,
-                generation_config=self.generation_config,
-                reduce_function=self.reduce_function,
-                output_model=output_model,
-            )
-
-        if self.generation_config.api_type == 'bedrock':
-            # call the bedrock api
-            message = self.client.generate(
-                messages=messages,
-                generation_config=self.generation_config,
-                reduce_function=self.reduce_function,
-                output_model=output_model,
-            )
-
+        message:Message = self.client.generate(
+            messages=messages,
+            generation_config=self.generation_config,
+            reduce_function=self.reduce_function,
+            output_model=output_model,
+        )
         message.name = self.name
 
+        generated_messages:List[Message] = [message]
+        
         # tool calls
-        tool_calls = messages[-1].content.tool_calls
-
-        if tool_calls == None:
-            return message
-
-        tool_responses = []
-        multimodal_responses = []
-        for tool_call in tool_calls:
-            if tool_call.type == 'function':
-                function = self.function_map.get(tool_call.function_call.name)
-                if function != None:
-                    response = function(**json.loads(tool_call.function_call.arguments))
-                    # the response is assumed to be a json string
-                    # if the key 'files' or the key 'url' is present, an additional message is generated
-                    tool_responses.append(
-                        Message(
-                            role='tool',
-                            content = Content(
-                                tool_response = ToolResponse(
-                                    id=tool_call.id,
-                                    name=tool_call.function_call.name,
-                                    content=response
-                                )
-                            ),
-                            name=tool_call.function_call.name,
-                        ),
-                    )
-
-                    deserialised_response = json.loads(response)
-                    files = deserialised_response.get('files')
-                    if files != None:
-                        files = [File(**file) for file in files]
-                    urls = deserialised_response.get('url')
-                    if files != None or urls != None:
-                        multimodal_responses.append(
+        tool_calls = generated_messages[-1].content.tool_calls
+        while tool_calls != None:
+            tool_responses:List[Message] = []
+            multimodal_responses:List[Message] = []
+            for tool_call in tool_calls:
+                if tool_call.type == 'function':
+                    function = self.function_map.get(tool_call.function_call.name)
+                    if function != None:
+                        response = function(**json.loads(tool_call.function_call.arguments))
+                        # the response is assumed to be a json string
+                        # if the key 'files' or the key 'url' is present, an additional message is generated
+                        tool_responses.append(
                             Message(
-                                role='user',
+                                role='tool',
                                 content = Content(
-                                    files=files,
-                                    url=urls
+                                    tool_response = ToolResponse(
+                                        id=tool_call.id,
+                                        name=tool_call.function_call.name,
+                                        content=response
+                                    )
                                 ),
-                                name=self.name,
-                            )
+                                name=tool_call.function_call.name,
+                            ),
                         )
-        
-        # call language model again
-        if self.generation_config.api_type in ['openai', 'azure', 'fastchat']:
-            second_message = self.client.generate(
-                messages=messages + [message] + tool_responses + multimodal_responses,
-                generation_config=self.generation_config,
-                reduce_function=self.reduce_function,
-                output_model=output_model,
-            )
-        
-        if self.generation_config.api_type == 'vertexai':
-            # call the vertex api
-            second_message = self.client.generate(
-                messages=messages + [message] + tool_responses + multimodal_responses,
-                generation_config=self.generation_config,
-                reduce_function=self.reduce_function,
-                output_model=output_model,
-            )
 
-        if self.generation_config.api_type == 'bedrock':
-            # call the bedrock api
-            second_message = self.client.generate(
-                messages=messages + [message] + tool_responses + multimodal_responses,
+                        deserialised_response = json.loads(response)
+                        files = deserialised_response.get('files')
+                        if files != None:
+                            files = [File(**file) for file in files]
+                        urls = deserialised_response.get('url')
+                        if files != None or urls != None:
+                            multimodal_responses.append(
+                                Message(
+                                    role='user',
+                                    content = Content(
+                                        files=files,
+                                        url=urls
+                                    ),
+                                    name=self.name,
+                                )
+                            )
+
+            generated_messages += tool_responses + multimodal_responses
+
+            second_message:Message = self.client.generate(
+                messages=messages + generated_messages,
                 generation_config=self.generation_config,
                 reduce_function=self.reduce_function,
                 output_model=output_model,
             )
-
-        second_message.name = self.name
-        return [message] + tool_responses + multimodal_responses + [second_message]
+            second_message.name = self.name
+            generated_messages += [second_message]
+            tool_calls = generated_messages[-1].content.tool_calls
+        
+        return generated_messages
 
     async def a_generate_response(
         self, 
         messages:List[Message], 
         output_model:Optional[BaseModel]=None
-    ) -> Union[None, Message, List[Message]]:
+    ) -> Union[None, List[Message]]:
         """
         Async version of generate_response
         """
@@ -226,113 +188,77 @@ class Agent():
                 name=self.name,
             )] + messages
 
-        # determine the api_type
-        if self.generation_config.api_type in ['openai', 'azure', 'fastchat']:
-            message = await self.client.a_generate(
-                messages=messages,
-                generation_config=self.generation_config,
-                reduce_function=self.reduce_function,
-                output_model=output_model,
-            )
-        
-        if self.generation_config.api_type == 'vertexai':
-            # call the vertex api
-            message = await self.client.a_generate(
-                messages=messages,
-                generation_config=self.generation_config,
-                reduce_function=self.reduce_function,
-                output_model=output_model,
-            )
 
-        if self.generation_config.api_type == 'bedrock':
-            # call the bedrock api
-            message = await self.client.a_generate(
-                messages=messages,
-                generation_config=self.generation_config,
-                reduce_function=self.reduce_function,
-                output_model=output_model,
-            )
-
+        message:Message = await self.client.a_generate(
+            messages=messages,
+            generation_config=self.generation_config,
+            reduce_function=self.reduce_function,
+            output_model=output_model,
+        )
         message.name = self.name
 
+        generated_messages:List[Message] = [message]
         # tool calls
-        tool_calls = messages[-1].content.tool_calls
+        tool_calls = generated_messages[-1].content.tool_calls
 
-        if tool_calls == None:
-            return message
-        
-        tasks = [
-            self.a_function_map.get(
-                tool_call.function_call.name
-            )(
-                **json.loads(tool_call.function_call.arguments)
-            ) for tool_call in tool_calls if tool_call.type == 'function'
-        ]
+        while tool_calls != None:        
+            tasks = [
+                self.a_function_map.get(
+                    tool_call.function_call.name
+                )(
+                    **json.loads(tool_call.function_call.arguments)
+                ) for tool_call in tool_calls if tool_call.type == 'function'
+            ]
 
-        responses = await asyncio.gather(*tasks)
+            responses = await asyncio.gather(*tasks)
 
-        tool_responses = []
-        multimodal_responses = []
-        for response, tool_call in zip(responses, tool_calls):
-            # the response is assumed to be a json string
-            # if the key 'files' or the key 'url' is present, an additional message is generated
-            tool_responses.append(
-                Message(
-                    role='tool',
-                    content = Content(
-                        tool_response = ToolResponse(
-                            id=tool_call.id,
-                            name=tool_call.function_call.name,
-                            content=response
-                        )
-                    ),
-                    name=tool_call.function_call.name,
-                ),
-            )
-
-            deserialised_response = json.loads(response)
-            files = deserialised_response.get('files')
-            if files != None:
-                files = [File(**file) for file in files]
-            urls = deserialised_response.get('url')
-            if files != None or urls != None:
-                multimodal_responses.append(
+            tool_responses = []
+            multimodal_responses = []
+            for response, tool_call in zip(responses, tool_calls):
+                # the response is assumed to be a json string
+                # if the key 'files' or the key 'url' is present, an additional message is generated
+                tool_responses.append(
                     Message(
-                        role='user',
+                        role='tool',
                         content = Content(
-                            files=files,
-                            url=urls
+                            tool_response = ToolResponse(
+                                id=tool_call.id,
+                                name=tool_call.function_call.name,
+                                content=response
+                            )
                         ),
-                        name=self.name,
-                    )
+                        name=tool_call.function_call.name,
+                    ),
                 )
 
-        # call language model again
-        if self.generation_config.api_type in ['openai', 'azure', 'fastchat']:
-            second_message = await self.client.a_generate(
-                messages=messages + [message] + tool_responses + multimodal_responses,
-                generation_config=self.generation_config,
-                reduce_function=self.reduce_function,
-                output_model=output_model,
-            )
-        
-        if self.generation_config.api_type == 'vertexai':
-            # call the vertex api
-            second_message = await self.client.a_generate(
-                messages=messages + [message] + tool_responses + multimodal_responses,
-                generation_config=self.generation_config,
-                reduce_function=self.reduce_function,
-                output_model=output_model,
-            )
+                deserialised_response = json.loads(response)
+                files = deserialised_response.get('files')
+                if files != None:
+                    files = [File(**file) for file in files]
+                urls = deserialised_response.get('url')
+                if files != None or urls != None:
+                    multimodal_responses.append(
+                        Message(
+                            role='user',
+                            content = Content(
+                                files=files,
+                                url=urls
+                            ),
+                            name=self.name,
+                        )
+                    )
 
-        if self.generation_config.api_type == 'bedrock':
-            # call the bedrock api
+            generated_messages += tool_responses + multimodal_responses
+
+            # call language model again
             second_message = await self.client.a_generate(
-                messages=messages + [message] + tool_responses + multimodal_responses,
+                messages=messages + generated_messages,
                 generation_config=self.generation_config,
                 reduce_function=self.reduce_function,
                 output_model=output_model,
             )
+            second_message.name = self.name
+            generated_messages += [second_message]
+            tool_calls = generated_messages[-1].content.tool_calls
 
-        second_message.name = self.name
-        return [message] + tool_responses + multimodal_responses + [second_message]
+        return generated_messages
