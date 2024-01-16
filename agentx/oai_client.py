@@ -151,7 +151,7 @@ class OAIClient():
             )
         else:
             raise Exception('Invalid API type.')
-    
+
     def generate(
             self,
             messages: List[Message],
@@ -167,7 +167,7 @@ class OAIClient():
                 Message(
                     role='user',
                     content=Content(
-                        text='You must return a JSON object following this json schema. {schema}'.format(
+                        text='You must return a JSON object according to this json schema. {schema}'.format(
                             schema = output_model.model_json_schema()
                         )
                     )
@@ -182,7 +182,7 @@ class OAIClient():
                     'function':tool.model_dump()
                 } for tool in generation_config.tools.values()
             ]
-        
+
         if generation_config.api_type == 'azure':
             kw_args['model'] = generation_config.azure_deployment
 
@@ -265,7 +265,7 @@ class OAIClient():
                 Message(
                     role='user', 
                     content=Content(
-                        text='You must return a JSON object following this json schema. {schema}'.format(
+                        text='You must return a JSON object according to this json schema. {schema}'.format(
                             schema=output_model.model_json_schema()
                         )
                     )
