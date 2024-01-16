@@ -151,7 +151,7 @@ async def group_chat(
 
     heuristic_map: Dict[Message, float] = {}
 
-    for current_iteration in range(max_iteration):
+    for current_iteration in tqdm(range(max_iteration)):
         # Pick the next agent to generate a response
         agent = agents[current_iteration % len(agents)]
         # Generate a response from the agent
