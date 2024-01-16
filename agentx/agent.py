@@ -119,9 +119,6 @@ class Agent():
             for tool_call in tool_calls:
                 if tool_call.type == 'function':
                     function = self.function_map.get(tool_call.function_call.name)
-                    if function == None:
-                        continue
-                    
                     response = function(**json.loads(tool_call.function_call.arguments))
                     # the response is assumed to be a json string
                     # if the key 'files' or the key 'url' is present, an additional message is generated
@@ -215,11 +212,10 @@ class Agent():
                     tool_call.function_call.name
                 ) for tool_call in tool_calls if tool_call.type == 'function'
             ]
-
             tasks = [
                 function(
                     **json.loads(tool_call.function_call.arguments)
-                ) for function in functions_to_call if function != None
+                ) for function in functions_to_call
             ]
 
             responses = await asyncio.gather(*tasks)

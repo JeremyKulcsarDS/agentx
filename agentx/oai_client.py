@@ -1,5 +1,5 @@
 import openai
-from openai.types.chat import ChatCompletion, ChatCompletionMessageToolCall
+from openai.types.chat import ChatCompletion, ChatCompletionMessage
 from typing import Dict, List, Callable, Optional, Union
 from pydantic import BaseModel
 from agentx.schema import Message, Content, ToolCall, FunctionCall, GenerationConfig
@@ -198,20 +198,21 @@ class OAIClient():
 
             for message in generated_messages:
                 if message.tool_calls != None:
-                    # deterministic ordering of tool calls
-                    tool_calls:List[ChatCompletionMessageToolCall] = sorted(message.tool_calls, key=lambda x: x.function.name)
-                    
+                    tool_calls = [
+                        ToolCall(
+                            id=tool_call.id,
+                            type=tool_call.type, 
+                            function_call=FunctionCall(
+                                name=tool_call.function.name.lower(), 
+                                arguments=tool_call.function.arguments
+                            )
+                        ) for tool_call in message.tool_calls if tool_call.function.name.lower() in generation_config.tools.keys()
+                    ]
+                    if tool_calls == []:
+                        continue
+
                     content = Content(
-                        tool_calls=[
-                            ToolCall(
-                                id=tool_call.id,
-                                type=tool_call.type, 
-                                function_call=FunctionCall(
-                                    name=tool_call.function.name.lower(), 
-                                    arguments=tool_call.function.arguments
-                                )
-                            ) for tool_call in tool_calls
-                        ]
+                        tool_calls=tool_calls
                     )
                 else:
                     content = Content(
@@ -291,25 +292,24 @@ class OAIClient():
                 **kw_args
             )
 
-            generated_messages = [choice.message for choice in response.choices]
+            generated_messages:List[ChatCompletionMessage] = [choice.message for choice in response.choices]
 
             for message in generated_messages:
                 if message.tool_calls != None:
-                    # sometimes the tool calls returned is not in the documented schema
-                    if message.tool_calls[0].function.name == 'parallel':
+                    tool_calls = [
+                        ToolCall(
+                            id=tool_call.id,
+                            type=tool_call.type, 
+                            function_call=FunctionCall(
+                                name=tool_call.function.name.lower(), 
+                                arguments=tool_call.function.arguments
+                            )
+                        ) for tool_call in message.tool_calls if tool_call.function.name.lower() in generation_config.tools.keys()
+                    ]
+                    if tool_calls == []:
                         continue
-                    
                     content = Content(
-                        tool_calls=[
-                            ToolCall(
-                                id=tool_call.id,
-                                type=tool_call.type, 
-                                function_call=FunctionCall(
-                                    name=tool_call.function.name.lower(), 
-                                    arguments=tool_call.function.arguments
-                                )
-                            ) for tool_call in message.tool_calls
-                        ]
+                        tool_calls=tool_calls
                     )
                 else:
                     content = Content(
