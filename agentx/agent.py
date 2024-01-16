@@ -119,40 +119,42 @@ class Agent():
             for tool_call in tool_calls:
                 if tool_call.type == 'function':
                     function = self.function_map.get(tool_call.function_call.name)
-                    if function != None:
-                        response = function(**json.loads(tool_call.function_call.arguments))
-                        # the response is assumed to be a json string
-                        # if the key 'files' or the key 'url' is present, an additional message is generated
-                        tool_responses.append(
-                            Message(
-                                role='tool',
-                                content = Content(
-                                    tool_response = ToolResponse(
-                                        id=tool_call.id,
-                                        name=tool_call.function_call.name,
-                                        content=response
-                                    )
-                                ),
-                                name=tool_call.function_call.name,
-                            ),
-                        )
-
-                        deserialised_response = json.loads(response)
-                        files = deserialised_response.get('files')
-                        if files != None:
-                            files = [File(**file) for file in files]
-                        urls = deserialised_response.get('url')
-                        if files != None or urls != None:
-                            multimodal_responses.append(
-                                Message(
-                                    role='user',
-                                    content = Content(
-                                        files=files,
-                                        url=urls
-                                    ),
-                                    name=self.name,
+                    if function == None:
+                        continue
+                    
+                    response = function(**json.loads(tool_call.function_call.arguments))
+                    # the response is assumed to be a json string
+                    # if the key 'files' or the key 'url' is present, an additional message is generated
+                    tool_responses.append(
+                        Message(
+                            role='tool',
+                            content = Content(
+                                tool_response = ToolResponse(
+                                    id=tool_call.id,
+                                    name=tool_call.function_call.name,
+                                    content=response
                                 )
+                            ),
+                            name=tool_call.function_call.name,
+                        ),
+                    )
+
+                    deserialised_response = json.loads(response)
+                    files = deserialised_response.get('files')
+                    if files != None:
+                        files = [File(**file) for file in files]
+                    urls = deserialised_response.get('url')
+                    if files != None or urls != None:
+                        multimodal_responses.append(
+                            Message(
+                                role='user',
+                                content = Content(
+                                    files=files,
+                                    url=urls
+                                ),
+                                name=self.name,
                             )
+                        )
 
             generated_messages += tool_responses + multimodal_responses
 
@@ -198,6 +200,9 @@ class Agent():
             reduce_function=self.reduce_function,
             output_model=output_model,
         )
+        
+        if message == None:
+            return None
         message.name = self.name
 
         generated_messages:List[Message] = [message]
@@ -205,12 +210,16 @@ class Agent():
         tool_calls = generated_messages[-1].content.tool_calls
 
         while tool_calls != None:
-            tasks = [
+            functions_to_call = [
                 self.a_function_map.get(
                     tool_call.function_call.name
-                )(
-                    **json.loads(tool_call.function_call.arguments)
                 ) for tool_call in tool_calls if tool_call.type == 'function'
+            ]
+
+            tasks = [
+                function(
+                    **json.loads(tool_call.function_call.arguments)
+                ) for function in functions_to_call if function != None
             ]
 
             responses = await asyncio.gather(*tasks)
@@ -260,6 +269,8 @@ class Agent():
                 reduce_function=self.reduce_function,
                 output_model=output_model,
             )
+            if second_message == None:
+                return None
             second_message.name = self.name
             generated_messages += [second_message]
             tool_calls = generated_messages[-1].content.tool_calls
