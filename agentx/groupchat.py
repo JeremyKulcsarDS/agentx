@@ -157,6 +157,10 @@ async def group_chat(
         # Generate a response from the agent
         response = await agent.a_generate_response(messages)
 
+        # error handling for None response
+        if response == None:
+            return messages, heuristic_map
+        
         heuristic_score = heuristic(messages + response)
         heuristic_map.update({message:heuristic_score for message in response})
         
