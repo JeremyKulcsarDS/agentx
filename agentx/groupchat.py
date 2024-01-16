@@ -162,7 +162,7 @@ async def group_chat(
         
         messages.extend(response)
         # if heuristic score is less than the threshold, terminate the chat
-        if heuristic and heuristic_score < threshold:
+        if heuristic_score and heuristic_score < threshold:
             return messages, heuristic_map
 
     return messages, heuristic_map
