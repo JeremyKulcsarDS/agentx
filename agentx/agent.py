@@ -207,15 +207,12 @@ class Agent():
         tool_calls = generated_messages[-1].content.tool_calls
 
         while tool_calls != None:
-            functions_to_call = [
+            tasks = [
                 self.a_function_map.get(
                     tool_call.function_call.name
-                ) for tool_call in tool_calls if tool_call.type == 'function'
-            ]
-            tasks = [
-                function(
+                )(
                     **json.loads(tool_call.function_call.arguments)
-                ) for function in functions_to_call
+                ) for tool_call in tool_calls if tool_call.type == 'function'
             ]
 
             responses = await asyncio.gather(*tasks)
