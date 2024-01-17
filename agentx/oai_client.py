@@ -1,5 +1,7 @@
 import openai
-from openai.types.chat import ChatCompletion, ChatCompletionMessage
+import json
+from jsonschema import validate
+from openai.types.chat import ChatCompletion, ChatCompletionMessage, ChatCompletionMessageToolCall
 from typing import Dict, List, Callable, Optional, Union
 from pydantic import BaseModel
 from agentx.schema import Message, Content, ToolCall, FunctionCall, GenerationConfig
@@ -113,6 +115,16 @@ def transform_message_openai(message:Message) -> Dict:
             'tool_call_id': message.content.tool_response.id,
         }
 
+def validate_function_call(tool_call:ChatCompletionMessageToolCall, config:GenerationConfig) -> bool:
+    if tool_call.function.name.lower() not in config.tools.keys():
+        return False
+    try:
+        arguments = json.loads(tool_call.function.arguments)
+        schema = config.tools.get(tool_call.function.name.lower()).parameters
+        validate(arguments, schema)
+        return True
+    except:
+        return False
 
 class OAIClient():
     def __init__(self, generation_config:GenerationConfig):
@@ -201,12 +213,12 @@ class OAIClient():
                     tool_calls = [
                         ToolCall(
                             id=tool_call.id,
-                            type=tool_call.type, 
+                            type=tool_call.type,
                             function_call=FunctionCall(
                                 name=tool_call.function.name.lower(), 
                                 arguments=tool_call.function.arguments
                             )
-                        ) for tool_call in message.tool_calls if tool_call.function.name.lower() in generation_config.tools.keys()
+                        ) for tool_call in message.tool_calls if validate_function_call(tool_call, generation_config)
                     ]
                     if tool_calls == []:
                         continue
@@ -304,7 +316,7 @@ class OAIClient():
                                 name=tool_call.function.name.lower(), 
                                 arguments=tool_call.function.arguments
                             )
-                        ) for tool_call in message.tool_calls if tool_call.function.name.lower() in generation_config.tools.keys()
+                        ) for tool_call in message.tool_calls if validate_function_call(tool_call, generation_config)
                     ]
                     if tool_calls == []:
                         continue
