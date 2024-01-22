@@ -204,16 +204,18 @@ class TextualGradientPromptTrainer():
             # impose a maximum number of samples per round
             n_samples_per_round = max(self.n_sample, n_samples_per_round)
             # sample data
-            sampled_x, sampled_y = random.sample(zip(x, y), n_samples_per_round)
+            sample_indices = random.sample(range(len(x)), n_samples_per_round)
+            sampled_x = [x[i] for i in sample_indices]
+            sampled_y = [y[i] for i in sample_indices]
             # compute the loss for the expanded prompts
             for prompt in prompts_remained:
-                _agent = copy.deepcopy(self.agent)
+                _agent = copy.copy(self.agent)
                 if self.target == 'agent':
                     _agent.system_prompt = prompt
                 else:
                     _agent.generation_config.tools[self.target].description = prompt
 
-                predict = self._forward(_agent, sampled_x)
+                predict = await self._forward(_agent, sampled_x)
 
                 loss = [self.loss(p, t) for p, t in zip(predict, sampled_y) if p != None]
                 if asyncio.iscoroutine(loss[-1]):
@@ -246,15 +248,15 @@ class TextualGradientPromptTrainer():
         for i in tqdm(range(n_training_steps), desc='Training Step'):
             i = i % (len(x) // self.batch_size)
             # sample a mini batch of data
-            batch = (x[i*self.batch_size:(i+1)*self.batch_size], y[i*self.batch_size:(i+1)*self.batch_size])
+            batch_x = x[i*self.batch_size:(i+1)*self.batch_size]
+            batch_y = y[i*self.batch_size:(i+1)*self.batch_size]
             
             # expand
             expanded_prompts = []
             for prompt in tqdm(prompts, desc='Expanding Prompts'):
-                expanded_prompts.extend(await self.expand(prompt, x=batch[0], y=batch[1]))
-            
+                expanded_prompts.extend(await self.expand(prompt, x=batch_x, y=batch_y))
             # select
-            prompts_remained, scores = self.select(expanded_prompts, x=batch[0], y=batch[1])
+            prompts_remained, scores = await self.select(expanded_prompts, x=x, y=y)
             scores_log.append(scores)
             prompts = prompts_remained
 

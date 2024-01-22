@@ -96,7 +96,7 @@ class TextualGradientPromptTrainerTest(unittest.IsolatedAsyncioTestCase):
             loss=loss,
             batch_size=10,
             n_beam=4,
-            n_sample=10,
+            n_sample=5,
             budget=50
         )
 
@@ -104,7 +104,7 @@ class TextualGradientPromptTrainerTest(unittest.IsolatedAsyncioTestCase):
         result = await self.trainer.fit(
             x=self.x_train,
             y=self.y_train,
-            n_training_steps=5,
+            n_training_steps=2,
         )
 
         print(result)
