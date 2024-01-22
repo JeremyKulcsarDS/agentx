@@ -1,7 +1,7 @@
 import asyncio
 from copy import deepcopy
 import json
-from typing import Dict, List, Callable, Optional, Union
+from typing import List, Callable, Optional, Union, TypeVar
 from pydantic import BaseModel
 from agentx.schema import Message, Content, ToolResponse, GenerationConfig, File, Function
 from agentx.tool import Tool
@@ -9,6 +9,7 @@ import agentx.oai_client
 import agentx.vertexai_client
 import agentx.bedrock_client
 
+OutputType = TypeVar('OutputType')
 class Agent():
     """
     Base class for all agents
@@ -41,15 +42,15 @@ class Agent():
         self,
         name:str,
         generation_config:GenerationConfig,
-        system_prompt:Optional[str]=None,
-        tools:Optional[List[Tool]]=None,
+        system_prompt:Union[str, None]=None,
+        tools:Union[List[Tool], None]=None,
         termination_function:Callable[[List[Message]], bool]=lambda x: False,
         reduce_function:Callable[[List[Message]], Message]=lambda x: x[-1],
     ):
         function_map = {tool.name: tool.run for tool in tools} if tools != None else {}
         a_function_map = {tool.name: tool.a_run for tool in tools} if tools != None else {}
-        _generation_config = generation_config.model_copy(deep=True)
-        if tools != None:
+        _generation_config = generation_config.model_copy(deep=True) if generation_config != None else None
+        if tools != None and _generation_config != None:
             _generation_config.tools = {
                 tool.name:Function(
                     name=tool.name,
@@ -78,10 +79,11 @@ class Agent():
         if self.generation_config.api_type == 'bedrock':
             self.client = agentx.bedrock_client.BedrockClient()
 
+
     def generate_response(
         self,
         messages:List[Message],
-        output_model:Optional[BaseModel]=None
+        output_model:Union[OutputType, None]=None,
     ) -> Union[None, List[Message]]:
         """
         Generate a response to the given messages based on the generation config
@@ -171,8 +173,8 @@ class Agent():
 
     async def a_generate_response(
         self, 
-        messages:List[Message], 
-        output_model:Optional[BaseModel]=None
+        messages:List[Message],
+        output_model:Union[OutputType, None]=None,
     ) -> Union[None, List[Message]]:
         """
         Async version of generate_response
