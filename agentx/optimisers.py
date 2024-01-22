@@ -149,9 +149,9 @@ class TextualGradientPromptTrainer():
         
         predict:List[PredictType] = []
         # generate responses for each data point
-        for index in range(0, self.batch_size, self.concurrency):
+        for index in range(0, len(x), self.concurrency):
             batch = await asyncio.gather(*[
-                self.forward(agent, x[i]) for i in range(index, index+self.concurrency)
+                self.forward(agent, x[i]) for i in range(index, min(index+self.concurrency, len(x)))
             ])
             predict.extend(batch)
             # avoid rate limiting error
@@ -250,7 +250,6 @@ class TextualGradientPromptTrainer():
             # sample a mini batch of data
             batch_x = x[i*self.batch_size:(i+1)*self.batch_size]
             batch_y = y[i*self.batch_size:(i+1)*self.batch_size]
-            
             # expand
             expanded_prompts = []
             for prompt in tqdm(prompts, desc='Expanding Prompts'):
