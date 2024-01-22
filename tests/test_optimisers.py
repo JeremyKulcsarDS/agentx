@@ -86,8 +86,8 @@ class TextualGradientPromptTrainerTest(unittest.IsolatedAsyncioTestCase):
             if not predicted:
                 return None
 
-            l2 = (predicted.salary - truth.salary)**2
-            return l2
+            l1 = abs(predicted.salary - truth.salary)
+            return l1
         
         self.trainer = TextualGradientPromptTrainer(
             agent=salary_prediction_agent,
@@ -108,5 +108,3 @@ class TextualGradientPromptTrainerTest(unittest.IsolatedAsyncioTestCase):
         )
 
         print(result)
-
-

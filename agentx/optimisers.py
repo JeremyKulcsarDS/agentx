@@ -202,7 +202,7 @@ class TextualGradientPromptTrainer():
             n_k = ((self.budget - K) / (K - i)) / log_bar_K
             n_samples_per_round = ceil(n_k)
             # impose a maximum number of samples per round
-            n_samples_per_round = max(self.n_sample, n_samples_per_round)
+            n_samples_per_round = min(self.n_sample, n_samples_per_round)
             # sample data
             sample_indices = random.sample(range(len(x)), n_samples_per_round)
             sampled_x = [x[i] for i in sample_indices]
@@ -218,10 +218,15 @@ class TextualGradientPromptTrainer():
                 predict = await self._forward(_agent, sampled_x)
 
                 loss = [self.loss(p, t) for p, t in zip(predict, sampled_y) if p != None]
+
+                # ignore if there is no loss
+                if len(loss) == 0:
+                    continue
+
                 if asyncio.iscoroutine(loss[-1]):
                     loss = asyncio.gather(*loss)
+                
                 loss = mean(loss)
-
                 scores[prompt] += loss
             # find and remove the lowest scoring prompt
             prompts_remained.sort(key=lambda prompt: scores[prompt], reverse=True)
