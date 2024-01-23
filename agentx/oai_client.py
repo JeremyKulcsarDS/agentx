@@ -161,7 +161,7 @@ class OAIClient():
                 timeout=generation_config.timeout,
                 max_retries=generation_config.max_retries,
             )
-        else:
+        if self.client == None or self.a_client == None:
             raise Exception('Invalid API type.')
 
     def generate(

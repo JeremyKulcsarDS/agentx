@@ -25,14 +25,15 @@ class AgentTestCase(unittest.TestCase):
     
     def setUp(self):
         self.generation_config = GenerationConfig(
-            api_type='azure',
-            api_key=os.environ.get('AZURE_OPENAI_KEY'),
-            base_url=os.environ.get('AZURE_OPENAI_ENDPOINT'),
+            api_type='openai',
+            api_key=os.environ.get('OPENAI_API_KEY'),
+            #base_url=os.environ.get('AZURE_OPENAI_ENDPOINT'),
+            model='gpt-3.5-turbo-1106'
         )
 
     def test_generate_termination_message(self):
         generation_config = self.generation_config
-        generation_config.azure_deployment = 'gpt-35'
+        #generation_config.azure_deployment = 'gpt-35'
         def terminate(message:List[Message]):
             if message[-1].content.text == 'some text':
                 return True
@@ -51,7 +52,7 @@ class AgentTestCase(unittest.TestCase):
 
     def test_generate_text_response(self):
         generation_config = self.generation_config
-        generation_config.azure_deployment = 'gpt-35'
+        #generation_config.azure_deployment = 'gpt-35'
 
         agent = Agent(
             name='test_agent',
@@ -64,9 +65,9 @@ class AgentTestCase(unittest.TestCase):
             ]
         )
 
-        self.assertEqual(text_message.role, 'assistant')
-        print(text_message.content.text)
-        self.assertIsNotNone(text_message.content.text)
+        self.assertEqual(text_message[-1].role, 'assistant')
+        print(text_message[-1].content.text)
+        self.assertIsNotNone(text_message[-1].content.text)
 
     def test_generate_output_model_response(self):
         generation_config = self.generation_config
