@@ -133,14 +133,14 @@ class OAIClient():
             self.client = openai.OpenAI(
                 api_key=generation_config.api_key,
                 organization=generation_config.organization,
-                base_url=generation_config.base_url.unicode_string(),
+                base_url=generation_config.base_url.unicode_string() if generation_config.base_url else None,
                 timeout=generation_config.timeout,
                 max_retries=generation_config.max_retries,
             )
             self.a_client = openai.AsyncOpenAI(
                 api_key=generation_config.api_key,
                 organization=generation_config.organization,
-                base_url=generation_config.base_url.unicode_string(),
+                base_url=generation_config.base_url.unicode_string() if generation_config.base_url else None,
                 timeout=generation_config.timeout,
                 max_retries=generation_config.max_retries,
             )
