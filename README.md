@@ -17,7 +17,7 @@ For more information about LLM agents I highly recommend reading this [blog](htt
 * Load tools to your LLM agents
 * Publish your tools on the platform
 * A* search for automated planning and execution of tools orchestrated with a set of agents
-* Prompt optimisation (on roadmap)
+* Prompt optimisation
 * Inference parameter optimisation (on roadmap)
 * Supported Models
   * ChatGPT-3.5-Turbo
