@@ -1,5 +1,5 @@
 import asyncio
-from copy import deepcopy
+from copy import deepcopy, copy
 import queue
 from agentx.agent import Agent, Message
 from typing import Callable, List, Union, Tuple, Dict
@@ -148,6 +148,7 @@ async def group_chat(
     Start the chat, with the first agent initiating the conversation.
     Each agent in the agents list will take turn in a roundtable to generate a response to the messages.
     '''
+    _messages = copy(messages)
 
     heuristic_map: Dict[Message, float] = {}
 
@@ -155,18 +156,18 @@ async def group_chat(
         # Pick the next agent to generate a response
         agent = agents[current_iteration % len(agents)]
         # Generate a response from the agent
-        response = await agent.a_generate_response(messages)
+        response = await agent.a_generate_response(_messages)
 
         # error handling for None response
         if response == None:
-            return messages, heuristic_map
+            return _messages, heuristic_map
         
-        heuristic_score = heuristic(messages + response)
+        heuristic_score = heuristic(_messages + response)
         heuristic_map.update({message:heuristic_score for message in response})
         
-        messages.extend(response)
+        _messages.extend(_messages)
         # if heuristic score is less than the threshold, terminate the chat
         if heuristic_score and heuristic_score < threshold:
-            return messages, heuristic_map
+            return _messages, heuristic_map
 
-    return messages, heuristic_map
+    return _messages, heuristic_map
