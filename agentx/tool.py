@@ -29,7 +29,7 @@ class Tool():
         # api token for server access
         self.api_key: Optional[str] = api_key
         if self.api_key == None:
-            self.api_key = os.environ.get('FM_TOOL_API_KEY')
+            self.api_key = os.environ.get('XENTROPY_API_KEY')
 
         self.name: Optional[str] = kwargs.get('name')
         self.description: Optional[str] = kwargs.get('description')
