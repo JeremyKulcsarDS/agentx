@@ -142,17 +142,24 @@ async def group_chat(
     messages: List[Message],
     heuristic: Callable[[List[Message]], Union[float, None]]=lambda x: None,
     threshold: int=10,
-    max_iteration:int=10,
+    max_iteration:int=3,
 ):
     '''
     Start the chat, with the first agent initiating the conversation.
     Each agent in the agents list will take turn in a roundtable to generate a response to the messages.
+    
+    :param agents: List of agents participating in the conversation
+    :param messages: List of messages to start the conversation
+    :param heuristic: Heuristic function for estimating how far the current conversation is from the goal
+    :param threshold: Threshold for the heuristic function
+    :param max_iteration: Terminate the chat after max_iteration of turns. 
+        For each turn, each agent in the agents list will, by its order, generate a response.
     '''
     _messages = copy(messages)
 
     heuristic_map: Dict[Message, float] = {}
 
-    for current_iteration in tqdm(range(max_iteration)):
+    for current_iteration in tqdm(range(max_iteration*len(agents))):
         # Pick the next agent to generate a response
         agent = agents[current_iteration % len(agents)]
         # Generate a response from the agent
