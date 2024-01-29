@@ -126,7 +126,7 @@ class Tool():
         else:
             return response.json()
 
-    def _run(
+    def run(
         self,
         *args,
         **kwargs
@@ -159,12 +159,7 @@ class Tool():
 
         return response.get('response')
 
-
-    def run(self, *args, **kwargs) -> str:
-        return self._run(*args, **kwargs)
-    
-
-    async def _a_run(
+    async def a_run(
         self,
         *args,
         **kwargs,
@@ -198,7 +193,3 @@ class Tool():
                     raise Exception(response.get('error_message'))
 
                 return response.get('response')
-
-
-    async def a_run(self, *args, **kwargs) -> str:
-        return await self._a_run(*args, **kwargs)
