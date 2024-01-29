@@ -171,7 +171,7 @@ async def group_chat(
             heuristic_score = heuristic(_messages + response)
             heuristic_map.update({message:heuristic_score for message in response})
             
-            _messages.extend(_messages)
+            _messages.extend(response)
             # if heuristic score is less than the threshold, terminate the chat
             if heuristic_score and heuristic_score < threshold:
                 return _messages, heuristic_map
