@@ -159,22 +159,21 @@ async def group_chat(
 
     heuristic_map: Dict[Message, float] = {}
 
-    for current_iteration in tqdm(range(max_iteration*len(agents))):
-        # Pick the next agent to generate a response
-        agent = agents[current_iteration % len(agents)]
-        # Generate a response from the agent
-        response = await agent.a_generate_response(_messages)
+    for current_iteration in tqdm(range(max_iteration*len(agents), desc='Iteration')):
+        for agent in tqdm(agents, desc='Agent'):
+            # Generate a response from the agent
+            response = await agent.a_generate_response(_messages)
 
-        # error handling for None response
-        if response == None:
-            return _messages, heuristic_map
-        
-        heuristic_score = heuristic(_messages + response)
-        heuristic_map.update({message:heuristic_score for message in response})
-        
-        _messages.extend(_messages)
-        # if heuristic score is less than the threshold, terminate the chat
-        if heuristic_score and heuristic_score < threshold:
-            return _messages, heuristic_map
+            # error handling for None response
+            if response == None:
+                return _messages, heuristic_map
+            
+            heuristic_score = heuristic(_messages + response)
+            heuristic_map.update({message:heuristic_score for message in response})
+            
+            _messages.extend(_messages)
+            # if heuristic score is less than the threshold, terminate the chat
+            if heuristic_score and heuristic_score < threshold:
+                return _messages, heuristic_map
 
     return _messages, heuristic_map
