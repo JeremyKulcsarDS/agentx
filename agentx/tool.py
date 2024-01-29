@@ -126,7 +126,7 @@ class Tool():
         else:
             return response.json()
 
-    def run(
+    def _run(
         self,
         *args,
         **kwargs
@@ -159,7 +159,12 @@ class Tool():
 
         return response.get('response')
 
-    async def a_run(
+
+    def run(self, *args, **kwargs) -> str:
+        return self._run(*args, **kwargs)
+    
+
+    async def _a_run(
         self,
         *args,
         **kwargs,
@@ -167,12 +172,14 @@ class Tool():
         url = f'https://api.xentropy.co/tool/{self.name}'
 
         # build headers
-        parent_id = kwargs.pop('parent_id', None)
         headers = {
             'Api-Key': self.api_key,
-            'Parent-Id': parent_id,
             'Content-Type': 'application/json',
         }
+
+        parent_id = kwargs.pop('parent_id', None)
+        if parent_id != None:
+            headers['Parent-Id'] = parent_id
 
         # use the tool
         model = self.input_model.model_validate(kwargs)
@@ -191,3 +198,7 @@ class Tool():
                     raise Exception(response.get('error_message'))
 
                 return response.get('response')
+
+
+    async def a_run(self, *args, **kwargs) -> str:
+        return await self._a_run(*args, **kwargs)
