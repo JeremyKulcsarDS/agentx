@@ -47,17 +47,29 @@ class Agent():
         termination_function:Callable[[List[Message]], bool]=lambda x: False,
         reduce_function:Callable[[List[Message]], Message]=lambda x: x[-1],
     ):
-        function_map = {tool.name: tool.run for tool in tools} if tools != None else {}
-        a_function_map = {tool.name: tool.a_run for tool in tools} if tools != None else {}
-        _generation_config = generation_config.model_copy(deep=True) if generation_config != None else None
-        if tools != None and _generation_config != None:
+        # Create function_map dictionary with tool names as keys and their associated run functions as values,
+        # if tools is not None. Otherwise, an empty dictionary is assigned.
+        function_map = {tool.name: tool.run for tool in tools} if tools is not None else {}
+        
+        # Create a_function_map dictionary with tool names as keys and their associated a_run functions as values,
+        # if tools is not None. Otherwise, an empty dictionary is assigned.
+        a_function_map = {tool.name: tool.a_run for tool in tools} if tools is not None else {}
+        
+        # Create a deep copy of generation_config if it is not None. Otherwise, assign None.
+        _generation_config = generation_config.model_copy(deep=True) if generation_config is not None else None
+        
+        # If tools and _generation_config are not None, update _generation_config's tools attribute
+        # with Function objects created from each tool in tools.
+        if tools is not None and _generation_config is not None:
             _generation_config.tools = {
-                tool.name:Function(
+                tool.name: Function(
                     name=tool.name,
                     description=tool.description,
                     parameters=tool.input_json_schema,
                 ) for tool in tools
             }
+        
+        # Assign the provided arguments to the object's attributes.
         self.name = name
         self.system_prompt = system_prompt
         self.generation_config = _generation_config
@@ -66,16 +78,19 @@ class Agent():
         self.termination_function = termination_function
         self.reduce_function = reduce_function
 
+        # If api_type in generation_config is 'openai', 'fastchat', or 'azure', create an OAIClient object.
         if self.generation_config.api_type in ['openai', 'fastchat', 'azure']:
             self.client = agentx.oai_client.OAIClient(
                 generation_config=self.generation_config
             )
 
+        # If api_type in generation_config is 'vertexai', create a VertexAIClient object.
         if self.generation_config.api_type == 'vertexai':
             self.client = agentx.vertexai_client.VertexAIClient(
                 generation_config=generation_config
             )
-        
+
+        # If api_type in generation_config is 'bedrock', create a BedrockClient object.
         if self.generation_config.api_type == 'bedrock':
             self.client = agentx.bedrock_client.BedrockClient()
 
@@ -94,7 +109,7 @@ class Agent():
 
         _messages = deepcopy(messages)
         # add system prompt
-        if self.system_prompt != None:
+        if self.system_prompt is not None:
             _messages = [Message(
                 role='system',
                 content=Content(
@@ -109,7 +124,7 @@ class Agent():
             reduce_function=self.reduce_function,
             output_model=output_model,
         )
-        if message == None:
+        if message is None:
             return None
         message.name = self.name
 
@@ -117,7 +132,7 @@ class Agent():
         
         # tool calls
         tool_calls = generated_messages[-1].content.tool_calls
-        while tool_calls != None:
+        while tool_calls is not None:
             tool_responses:List[Message] = []
             multimodal_responses:List[Message] = []
             for tool_call in tool_calls:
@@ -142,10 +157,10 @@ class Agent():
 
                     deserialised_response = json.loads(response)
                     files = deserialised_response.get('files')
-                    if files != None:
+                    if files is not None:
                         files = [File(**file) for file in files]
                     urls = deserialised_response.get('url')
-                    if files != None or urls != None:
+                    if files is not None or urls is not None:
                         multimodal_responses.append(
                             Message(
                                 role='user',
