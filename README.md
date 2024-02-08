@@ -10,7 +10,7 @@ AgentX enables developers to build powerful LLM (Large Language Model) agents fa
 
 AgentX comes in as a platform for developers to share tools they built and load existing tools to speed up development. It also provides a set of utilities for automated planning and execution of tools orchestrated with a set of agents.
 
-For more information about LLM agents I highly recommend reading this [blog](https://lilianweng.github.io/posts/2023-06-23-agent/) by Lilian Weng.
+For more information about LLM agents we highly recommend reading this [blog](https://lilianweng.github.io/posts/2023-06-23-agent/) by Lilian Weng.
 
 ## Features
 
@@ -24,7 +24,7 @@ For more information about LLM agents I highly recommend reading this [blog](htt
   * GPT-4
   * GPT-4-Vision
   * ToolLlama-7B
-  * Gemini-Pro (on roadmap)
+  * Gemini-Pro (currently under development)
   * Gemini-Pro-Vision (on roadmap)
   * Claude-2 (on roadmap)
   * Claude-2.1 (on roadmap)
@@ -53,7 +53,7 @@ If you want to contribute, feel free to fork the repository and submit pull requ
 
 ## Contact
 
-For questions or feedback, you can reach out to us at chankahei@xentropy.co.
+For questions or feedback, you can reach out to us at chankahei@xentropy.co or jeremy.kulcsar@diamondhill.io.
 
 ---
 
