@@ -24,7 +24,7 @@ For more information about LLM agents I highly recommend reading this [blog](htt
   * GPT-4
   * GPT-4-Vision
   * ToolLlama-7B
-  * Gemini-Pro (on roadmap)
+  * Gemini-Pro (currently under development)
   * Gemini-Pro-Vision (on roadmap)
   * Claude-2 (on roadmap)
   * Claude-2.1 (on roadmap)
