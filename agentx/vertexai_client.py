@@ -42,10 +42,10 @@ def transform_message_vertexai(message:Message) -> Dict:
         if content.files is None and content.urls is None and content.tool_calls is None and content.tool_response is None:
             return add_name(
                 {
-                    'role': 'user',
-                    'content': content.text,
+                    'role': message.role,
+                    'parts': [{'text':content.text}]
                 },
-                message.name
+                None
             )
     else:
         # DEVLOPMENT IS HERE
@@ -86,9 +86,10 @@ class VertexAIClient():
 
         contents = [transform_message_vertexai(message) for message in messages]
 
-        print('here')
+        print('contents:')
         print(contents)
 
+        """
         request_body = {
             "contents": contents,
             "tools": tools,
@@ -101,6 +102,14 @@ class VertexAIClient():
                 "stopSequences": generation_config.stop_sequences
             }
         }
+        """
+
+        request_body = {
+            "contents": contents,
+        }
+
+        print("request_body:")
+        print(request_body)
 
         # Extract project ID from the JSON file
         with open(generation_config.path_to_google_service_account_json) as json_file:
@@ -115,8 +124,6 @@ class VertexAIClient():
         print(PROJECT_ID)
         print(MODEL)
 
-        print(f'https://{REGION}-aiplatform.googleapis.com/v1/{MODEL}:streamGenerateContent')
-
         response = requests.post(
             url = f'https://{REGION}-aiplatform.googleapis.com/v1/projects/{PROJECT_ID}/locations/{REGION}/publishers/google/models/{MODEL}:streamGenerateContent',
             json=request_body,
@@ -127,6 +134,7 @@ class VertexAIClient():
             timeout = generation_config.timeout
         )
         
+        print('response:')
         print(response)
 
         return response.json()
