@@ -45,15 +45,11 @@ def transform_message_vertexai(message:Message) -> Dict:
                     'role': message.role,
                     'parts': [{'text':content.text}]
                 },
-                None
+                None # Keep the same code structure, since Vertex AI API would return a JSON decode error if a name is left
             )
     else:
-        # DEVLOPMENT IS HERE
-        pass
 
-# ================================================================================
-# END UNDER DEVELOPMENT ==========================================================
-# ================================================================================
+        pass
 
 
 class VertexAIClient():
@@ -86,30 +82,9 @@ class VertexAIClient():
 
         contents = [transform_message_vertexai(message) for message in messages]
 
-        print('contents:')
-        print(contents)
-
-        """
-        request_body = {
-            "contents": contents,
-            "tools": tools,
-            "generationConfig": {
-                "temperature": generation_config.temperature,
-                "topP": generation_config.top_p,
-                "topK": generation_config.top_k,
-                "candidateCount": generation_config.n_candidates,
-                "maxOutputTokens": generation_config.max_tokens,
-                "stopSequences": generation_config.stop_sequences
-            }
-        }
-        """
-
         request_body = {
             "contents": contents,
         }
-
-        print("request_body:")
-        print(request_body)
 
         # Extract project ID from the JSON file
         with open(generation_config.path_to_google_service_account_json) as json_file:
@@ -120,10 +95,6 @@ class VertexAIClient():
         REGION = generation_config.region
         MODEL = generation_config.model
 
-        print(REGION)
-        print(PROJECT_ID)
-        print(MODEL)
-
         response = requests.post(
             url = f'https://{REGION}-aiplatform.googleapis.com/v1/projects/{PROJECT_ID}/locations/{REGION}/publishers/google/models/{MODEL}:streamGenerateContent',
             json=request_body,
@@ -133,9 +104,6 @@ class VertexAIClient():
             },
             timeout = generation_config.timeout
         )
-        
-        print('response:')
-        print(response)
 
         return response.json()
         

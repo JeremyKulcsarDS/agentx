@@ -124,11 +124,12 @@ class Agent():
             reduce_function=self.reduce_function,
             output_model=output_model,
         )
-        print('message:')
-        print(message)
         if message is None:
             return None
-        message.name = self.name
+        elif isinstance(message, list):
+            return message
+        else:
+            message.name = self.name
 
         generated_messages:List[Message] = [message]
         
