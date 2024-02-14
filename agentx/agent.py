@@ -126,8 +126,6 @@ class Agent():
         )
         if message is None:
             return None
-        elif isinstance(message, list):
-            return message
         else:
             message.name = self.name
 

@@ -43,13 +43,42 @@ def transform_message_vertexai(message:Message) -> Dict:
             return add_name(
                 {
                     'role': message.role,
-                    'parts': [{'text':content.text}]
+                    'parts': [{'text':content.text}],
                 },
-                None # Keep the same code structure, since Vertex AI API would return a JSON decode error if a name is left
+                message.name # Keep the same code structure, since Vertex AI API would return a JSON decode error if a name is left
             )
     else:
-
         pass
+
+    if message.role == 'assistant':
+        tool_calls = message.content.tool_calls
+        if tool_calls == None:
+            return add_name(
+                {
+                    'role': 'assistant',
+                    'parts': [{'text':content.text}],
+                }, 
+                message.name
+            )
+        
+        _tool_calls = []
+        for tool_call in tool_calls:
+            _tool_calls.append({
+                'id': tool_call.id,
+                'type': tool_call.type,
+                'function': {
+                    'name': tool_call.function_call.name,
+                    'arguments': tool_call.function_call.arguments
+                }
+            })
+        return add_name(
+            {
+                'role': 'assistant',
+                'content':'',
+                'tool_calls': _tool_calls,
+            },
+            message.name
+        )
 
 
 class VertexAIClient():
@@ -79,6 +108,7 @@ class VertexAIClient():
                     'functionDeclaration': tool
                 } for tool in generation_config.tools
             ],
+        print(tools)
 
         contents = [transform_message_vertexai(message) for message in messages]
 
@@ -105,7 +135,28 @@ class VertexAIClient():
             timeout = generation_config.timeout
         )
 
-        return response.json()
+        _messages = []
+
+        try:
+            role = response.json()[0]['candidates'][0]['content']['role']
+            text = response.json()[0]['candidates'][0]['content']['parts'][0]['text']
+
+            _messages.append(Message(role=role, content=Content(text=text)))
+            return _messages
+
+        except json.JSONDecodeError as e:
+            # Handle JSON decoding error
+            print("Error decoding JSON from the Vertex AI POST request response:", e)
+
+        except ValueError as e:
+            # Handle other value-related errors
+            print("ValueError from the Vertex AI POST request response:", e)
+
+        except Exception as e:
+            # Handle other exceptions
+            print("Exception from the Vertex AI POST request response:", e)
+            raise e
+        
         
     async def a_generate(
             self, 
