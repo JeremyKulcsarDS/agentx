@@ -37,7 +37,17 @@ def transform_message_vertexai(message:Message) -> Dict:
     Returns:
         Dict: The transformed message dictionary.
     """
-    if message.role == 'system' or message.role == 'user':
+    if message.role == 'system':
+        content = message.content
+        return add_name(
+            {
+                'role': message.role,
+                'parts': [{'text':content.text}],
+                },
+            None
+        )
+    
+    if message.role == 'user':
         content = message.content
         if content.files is None and content.urls is None and content.tool_calls is None and content.tool_response is None:
             return add_name(
@@ -45,12 +55,25 @@ def transform_message_vertexai(message:Message) -> Dict:
                     'role': message.role,
                     'parts': [{'text':content.text}],
                 },
-                message.name # Keep the same code structure, since Vertex AI API would return a JSON decode error if a name is left
+                message.name
             )
     else:
         pass
 
-    if message.role == 'assistant':
+    if message.role == 'model':
+        content = message.content
+        if content.files is None and content.urls is None and content.tool_calls is None and content.tool_response is None:
+            return add_name(
+                {
+                    'role': message.role,
+                    'parts': [{'text':content.text}],
+                },
+                None # Keep the same code structure, since Vertex AI API would return a JSON decode error if a name is left
+            )
+    else:
+        pass
+
+    if message.role == 'assistant': # doesnt exist with vertex AI, need to find another way
         tool_calls = message.content.tool_calls
         if tool_calls == None:
             return add_name(
@@ -97,24 +120,45 @@ class VertexAIClient():
             generation_config:GenerationConfig,
             reduce_function:Optional[Callable[[List[Message]], Message]]=None,
             output_model:Optional[str] = None,
-        ) -> Message:
+        ) -> Union[Message, List[Message], None]:
+
         if not self.credentials.valid:
             self.credentials.refresh(self.auth_req)
         
         tools = generation_config.tools
         if tools is not None:
+            tool_content = [
+                {
+                    "name": tool,
+                } for tool in generation_config.tools
+            ]
             tools = [
                 {
-                    'functionDeclaration': tool
-                } for tool in generation_config.tools
-            ],
-        print(tools)
+                    'functionDeclarations': 
+                        tool_content
+                }
+            ]
+
+        print(messages)
 
         contents = [transform_message_vertexai(message) for message in messages]
 
+        print(contents)
+
         request_body = {
             "contents": contents,
+            "tools": tools,
+            "generationConfig": {
+                #"temperature": generation_config.temperature,
+                #"topP": generation_config.top_p,
+                #"topK": generation_config.top_k,
+                "candidateCount": generation_config.n_candidates,
+                #"maxOutputTokens": generation_config.max_tokens,
+                #"stopSequences": generation_config.stop_sequences
+            }
         }
+
+        print(request_body)
 
         # Extract project ID from the JSON file
         with open(generation_config.path_to_google_service_account_json) as json_file:
@@ -135,14 +179,22 @@ class VertexAIClient():
             timeout = generation_config.timeout
         )
 
+        print(response.json())
+
+        # relevant for vertex AI?
         _messages = []
 
         try:
+            
+            if 'error' in response.json()[0]:
+                if response.json()[0]['error']['code'] == 429:
+                    print(response.json()[0]['error']['message'])
+                    return None
+            
             role = response.json()[0]['candidates'][0]['content']['role']
             text = response.json()[0]['candidates'][0]['content']['parts'][0]['text']
 
             _messages.append(Message(role=role, content=Content(text=text)))
-            return _messages
 
         except json.JSONDecodeError as e:
             # Handle JSON decoding error
@@ -157,7 +209,17 @@ class VertexAIClient():
             print("Exception from the Vertex AI POST request response:", e)
             raise e
         
+        if len(_messages) == 0:
+            return None
+        elif len(_messages) == 1:
+            return _messages[0]
         
+        if reduce_function:
+            return reduce_function(_messages)
+        else:
+            return _messages
+        
+
     async def a_generate(
             self, 
             messages:List[Message],

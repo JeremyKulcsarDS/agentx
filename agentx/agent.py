@@ -108,6 +108,7 @@ class Agent():
             return None
 
         _messages = deepcopy(messages)
+        
         # add system prompt
         if self.system_prompt is not None:
             _messages = [Message(
