@@ -185,16 +185,24 @@ class VertexAIClient():
         _messages = []
 
         try:
-            
+
             if 'error' in response.json()[0]:
                 if response.json()[0]['error']['code'] == 429:
                     print(response.json()[0]['error']['message'])
                     return None
             
-            role = response.json()[0]['candidates'][0]['content']['role']
-            text = response.json()[0]['candidates'][0]['content']['parts'][0]['text']
+            if response.json()[0]['candidates'][0]['content']['role'] == "model" and 'functionCall' in response.json()[0]['candidates'][0]['content']['parts'][0]:
+            
+                role = response.json()[0]['candidates'][0]['content']['role']
 
-            _messages.append(Message(role=role, content=Content(text=text)))
+                _messages.append(Message(role=role, content=Content()))
+
+            else:
+
+                role = response.json()[0]['candidates'][0]['content']['role']
+                text = response.json()[0]['candidates'][0]['content']['parts'][0]['text']
+
+                _messages.append(Message(role=role, content=Content(text=text)))
 
         except json.JSONDecodeError as e:
             # Handle JSON decoding error

@@ -68,6 +68,8 @@ class Agent():
                     parameters=tool.input_json_schema,
                 ) for tool in tools
             }
+
+        print(_generation_config.tools)
         
         # Assign the provided arguments to the object's attributes.
         self.name = name
@@ -108,7 +110,7 @@ class Agent():
             return None
 
         _messages = deepcopy(messages)
-        
+
         # add system prompt
         if self.system_prompt is not None:
             _messages = [Message(
