@@ -62,6 +62,15 @@ def transform_message_vertexai(message:Message) -> Dict:
 
     if message.role == 'model':
         content = message.content
+        if content.tool_calls is not None:
+            print("content:", content)
+            return add_name(
+                {
+                    'role': "function",
+                    'parts': [{'text':content.text}],
+                },
+                message.name
+            )
         if content.files is None and content.urls is None and content.tool_calls is None and content.tool_response is None:
             return add_name(
                 {
@@ -139,11 +148,11 @@ class VertexAIClient():
                 }
             ]
 
-        print(messages)
+        print("message:", messages)
 
         contents = [transform_message_vertexai(message) for message in messages]
 
-        print(contents)
+        print("contents:", contents)
 
         request_body = {
             "contents": contents,
@@ -158,7 +167,7 @@ class VertexAIClient():
             }
         }
 
-        print(request_body)
+        print("request_body:", request_body)
 
         # Extract project ID from the JSON file
         with open(generation_config.path_to_google_service_account_json) as json_file:
@@ -179,7 +188,7 @@ class VertexAIClient():
             timeout = generation_config.timeout
         )
 
-        print(response.json())
+        print("response:",response.json())
 
         # relevant for vertex AI?
         _messages = []
@@ -195,7 +204,7 @@ class VertexAIClient():
             
                 role = response.json()[0]['candidates'][0]['content']['role']
 
-                _messages.append(Message(role=role, content=Content()))
+                _messages.append(Message(role=role, content=Content(function_call=response.json()[0]['candidates'][0]['content']['parts'][0]['functionCall'])))
 
             else:
 
@@ -216,6 +225,8 @@ class VertexAIClient():
             # Handle other exceptions
             print("Exception from the Vertex AI POST request response:", e)
             raise e
+        
+        print("return:", _messages)
         
         if len(_messages) == 0:
             return None
