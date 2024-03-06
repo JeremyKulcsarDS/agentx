@@ -3,11 +3,30 @@ import google.auth.transport.requests
 from google.oauth2 import service_account
 import aiohttp
 import json
-from typing import Coroutine, Callable, List, Dict, Optional, Union
+from typing import Callable, List, Dict, Optional, Union, Any
 import requests
-from agentx.schema import Message, Content, ToolCall, Function, GenerationConfig
+from pydantic import BaseModel
+from agentx.schema import Message, ToolCall, FunctionCall, GenerationConfig, Content
+from agentx.vertexai_utils import transform_openai_tool_to_vertexai_tool
 
+import vertexai
+from vertexai import generative_models
 
+VERTEXAI_API_KW = [
+    'model',
+    'frequency_penalty',
+    'logit_bias',
+    'max_tokens',
+    'n',
+    'presence_penalty',
+    'response_format',
+    'seed',
+    'stop',
+    'temperature',
+    'tool_choice',
+    'tools',
+    'top_p'
+]
 # ================================================================================
 # UNDER DEVELOPMENT ==============================================================
 # ================================================================================
@@ -61,16 +80,28 @@ def transform_message_vertexai(message:Message) -> Dict:
         pass
 
     if message.role == 'model':
-        content = message.content
-        if content.tool_calls is not None:
-            print("content:", content)
+        tool_calls = message.content.tool_calls
+        if tool_calls is not None:
+            print("tool_content:", content)
+            _tool_calls = []
+            for tool_call in tool_calls:
+                _tool_calls.append({
+                    'id': tool_call.id,
+                    'type': tool_call.type,
+                    'function': {
+                        'name': tool_call.function_call.name,
+                        'arguments': tool_call.function_call.arguments
+                    }
+                })
             return add_name(
                 {
                     'role': "function",
-                    'parts': [{'text':content.text}],
+                    'parts': [{'function_call':_tool_calls}],
                 },
                 message.name
             )
+        
+        content = message.content
         if content.files is None and content.urls is None and content.tool_calls is None and content.tool_response is None:
             return add_name(
                 {
@@ -82,35 +113,43 @@ def transform_message_vertexai(message:Message) -> Dict:
     else:
         pass
 
-    if message.role == 'assistant': # doesnt exist with vertex AI, need to find another way
-        tool_calls = message.content.tool_calls
-        if tool_calls == None:
-            return add_name(
-                {
-                    'role': 'assistant',
-                    'parts': [{'text':content.text}],
-                }, 
-                message.name
-            )
-        
-        _tool_calls = []
-        for tool_call in tool_calls:
-            _tool_calls.append({
-                'id': tool_call.id,
-                'type': tool_call.type,
-                'function': {
-                    'name': tool_call.function_call.name,
-                    'arguments': tool_call.function_call.arguments
-                }
-            })
-        return add_name(
-            {
-                'role': 'assistant',
-                'content':'',
-                'tool_calls': _tool_calls,
-            },
-            message.name
-        )
+
+""" def validate_function_call(tool_call:ChatCompletionMessageToolCall, config:GenerationConfig) -> bool: # adapt to Vertex AI
+    if tool_call.function.name.lower() not in config.tools.keys():
+        return False
+    try:
+        arguments = json.loads(tool_call.function.arguments)
+        schema = config.tools.get(tool_call.function.name.lower()).parameters
+        validate(arguments, schema)
+        return True
+    except:
+        return False """
+
+
+def replace_key(dictionary: Dict[str, Any], old_key: str, new_key: str) -> Dict[str, Any]:
+    """
+    Recursively replaces all occurrences of the old_key with the new_key in a dictionary.
+
+    Args:
+        dictionary (Dict[str, Any]): The input dictionary to modify.
+        old_key (str): The key to replace.
+        new_key (str): The new key to use.
+
+    Returns:
+        Dict[str, Any]: The modified dictionary with replaced keys.
+    """
+    new_dict = {}
+    for key, value in dictionary.items():
+        if isinstance(value, dict):
+            new_dict[key] = replace_key(value, old_key, new_key)  # Recursively process nested dictionaries
+        elif isinstance(value, list):
+            new_dict[key] = [replace_key(item, old_key, new_key) if isinstance(item, dict) else item for item in value]
+            # Recursively process nested dictionaries within lists
+        else:
+            new_dict[key] = value
+    if old_key in new_dict:
+        new_dict[new_key] = new_dict.pop(old_key)  # Replace the old_key with the new_key
+    return new_dict
 
 
 class VertexAIClient():
@@ -123,18 +162,298 @@ class VertexAIClient():
         self.auth_req = google.auth.transport.requests.Request()
         self.credentials.refresh(self.auth_req)
 
+        # Extract project ID from the JSON file
+        with open(generation_config.path_to_google_service_account_json) as json_file:
+            service_account_data = json.load(json_file)
+            project_id = service_account_data['project_id']
+
+        PROJECT_ID = project_id
+        REGION = generation_config.region
+        MODEL = generation_config.model
+
+        vertexai.init(project=PROJECT_ID, location=REGION)
+        self.model = MODEL
+
+
     def generate(
             self,
             messages:List[Message],
             generation_config:GenerationConfig,
             reduce_function:Optional[Callable[[List[Message]], Message]]=None,
-            output_model:Optional[str] = None,
+            output_model:BaseModel = None,
         ) -> Union[Message, List[Message], None]:
 
+        # kwargs
+        kw_args = {key:value for key, value in generation_config.model_dump().items() if value != None and key in VERTEXAI_API_KW}
+
+        # Check schema constraints
+        if output_model != None:
+            messages.append(
+                Message(
+                    role='user',
+                    content=Content(
+                        text='You must return a JSON object according to this json schema. {schema}'.format(
+                            schema = output_model.model_json_schema() 
+                        )
+                    )
+                )
+            )
+            kw_args['response_format'] = {'type':'json_object'}
+
+        # Creds management
         if not self.credentials.valid:
             self.credentials.refresh(self.auth_req)
+
+        # Model
+        if generation_config.api_type == 'vertexai':
+            kw_args['model'] = generation_config.model
+
+
+        test_dict = {
+            'name': 'xentropy--geocoding',
+            'description': 'Retrieve the latitude and longitude given an address using the highly accurate Google Map API.',
+            'parameters': {
+                'title': 'Address',
+                'type': 'object',
+                'properties': {
+                'address': {
+                    'title': 'Address',
+                    'type': 'string'
+                }
+                },
+                'required': [
+                'address'
+                ]
+            }
+        }
+
+        generative_models.FunctionDeclaration(**transform_openai_tool_to_vertexai_tool(test_dict))
+        print("xentropy--geocoding transformed to vertex AI schema successfully")
+
+
+        test_dict_2 = {
+            'name': 'xentropy--geodesic',
+            'description': 'Calculate the earth surface distance between two latitude and longitude coordinate',
+            'parameters': {
+                'title': 'CoordinatePair',
+                'type': 'object',
+                'properties': {
+                'coordinate_0': {
+                    '$ref': '#/definitions/Coordinate'
+                },
+                'coordinate_1': {
+                    '$ref': '#/definitions/Coordinate'
+                }
+                },
+                'required': [
+                'coordinate_0',
+                'coordinate_1'
+                ],
+                'definitions': {
+                'Coordinate': {
+                    'title': 'Coordinate',
+                    'type': 'object',
+                    'properties': {
+                    'latitude': {
+                        'title': 'Latitude',
+                        'type': 'number'
+                    },
+                    'longitude': {
+                        'title': 'Longitude',
+                        'type': 'number'
+                    }
+                    },
+                    'required': [
+                    'latitude',
+                    'longitude'
+                    ]
+                }
+                }
+            }
+            }
+
+        generative_models.FunctionDeclaration(**transform_openai_tool_to_vertexai_tool(test_dict_2))
+        print("xentropy--geodesic transformed to vertex AI schema successfully")
+
+        """ # Tools
+        if generation_config.tools != None:
+            kw_args['tools'] = [
+                generative_models.FunctionDeclaration(
+                    **tool.model_dump()
+                ) for tool in generation_config.tools.values()
+            ] """
         
-        tools = generation_config.tools
+
+        # Tools
+        if generation_config.tools != None:
+            kw_args['tools'] = [
+                generative_models.FunctionDeclaration(
+                    **replace_key(tool.model_dump(), "title", "description")
+                ) for tool in generation_config.tools.values()
+            ]
+        
+
+        print(generation_config.tools)
+        print(kw_args['tools'])
+
+
+        # Specify a function declaration and parameters for an API request
+        get_product_info_func = generative_models.FunctionDeclaration(
+            name="get_product_sku",
+            description="Get the SKU for a product",
+            # Function parameters are specified in OpenAPI JSON schema format
+            parameters={
+                "type": "object",
+                "properties": {
+                    "product_name": {"type": "string", "description": "Product name"}
+                },
+            },
+        )
+
+        # Specify another function declaration and parameters for an API request
+        get_store_location_func = generative_models.FunctionDeclaration(
+            name="get_store_location",
+            description="Get the location of the closest store",
+            # Function parameters are specified in OpenAPI JSON schema format
+            parameters={
+                "type": "object",
+                "properties": {"location": {"type": "string", "description": "Location"}},
+            },
+        )
+        
+        print(get_store_location_func)
+
+        # Define a tool that includes the above functions
+        retail_tool = generative_models.Tool(
+            function_declarations=[
+                get_product_info_func,
+                get_store_location_func,
+            ],
+        )
+
+        # Define the user's prompt in a Content object that we can reuse in model calls
+        user_prompt_content = generative_models.Content(
+            role="user",
+            parts=[
+                generative_models.Part.from_text("test"),
+            ],
+        )
+
+        # Initialise Gemini model
+        model = generative_models.GenerativeModel(self.model, tools=[retail_tool])
+
+        # Start a chat session
+        chat = model.start_chat()
+        
+        
+        
+        
+        
+        _messages = []
+
+        tool_calls = None
+
+        for num_retry in range(generation_config.max_retries):
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+            contents = [transform_message_vertexai(message) for message in messages]
+
+            request_body = {
+                "contents": contents,
+                "tools": tool_calls,
+                "generationConfig": {
+                    #"temperature": generation_config.temperature,
+                    #"topP": generation_config.top_p,
+                    #"topK": generation_config.top_k,
+                    "candidateCount": generation_config.n_candidates,
+                    #"maxOutputTokens": generation_config.max_tokens,
+                    #"stopSequences": generation_config.stop_sequences
+                }
+            }
+
+            response = requests.post(
+                url = f'https://{REGION}-aiplatform.googleapis.com/v1/projects/{PROJECT_ID}/locations/{REGION}/publishers/google/models/{MODEL}:streamGenerateContent',
+                json=request_body,
+                headers={
+                    "Content-Type": "application/json; charset=utf-8",
+                    "Authorization": "Bearer " + self.credentials.token
+                },
+                timeout = generation_config.timeout
+            )
+
+
+
+            # generated_messages = [choice.message for choice in response.choices] adapt to vertex AI
+
+            for message in generated_messages:
+                if message.tool_calls != None:
+                    tool_calls = [
+                        ToolCall(
+                            id=tool_call.id,
+                            type=tool_call.type,
+                            function_call=FunctionCall(
+                                name=tool_call.function.name.lower(), 
+                                arguments=tool_call.function.arguments
+                            )
+                        ) for tool_call in message.tool_calls # if validate_function_call(tool_call, generation_config)
+                    ]
+                    if tool_calls == []:
+                        continue
+
+                    content = Content(
+                        tool_calls=tool_calls
+                    )
+                else:
+                    content = Content(
+                        text=message.content,
+                    )
+
+                if output_model and content.text != None:
+                    try:
+                        output_model.model_validate_json(content.text)
+                        _messages.append(
+                            Message(
+                                role='assistant',
+                                content=content,
+                            )
+                        )
+                    except:
+                        pass
+                else:
+                    _messages.append(
+                        Message(
+                            role='assistant',
+                            content=content,
+                        )
+                    )
+
+            if len(_messages) >= generation_config.n_candidates:
+                _messages = _messages[:generation_config.n_candidates]
+                break
+
+        if len(_messages) == 0:
+            return None
+        if reduce_function:
+            return reduce_function(_messages)
+        else:
+            return _messages
+
+        """         tools = generation_config.tools
         if tools is not None:
             tool_content = [
                 {
@@ -143,10 +462,10 @@ class VertexAIClient():
             ]
             tools = [
                 {
-                    'functionDeclarations': 
+                    'functionCall': 
                         tool_content
                 }
-            ]
+            ] """
 
         print("message:", messages)
 

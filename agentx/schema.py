@@ -26,7 +26,6 @@ class ToolResponse(BaseModel):
 
 class Content(BaseModel):
     text: Optional[str] = None
-    function_call: Optional[Dict] = None
     files: Optional[List[File]] = None
     urls: Optional[List[HttpUrl]] = None
     tool_calls: Optional[List[ToolCall]] = None
