@@ -208,8 +208,6 @@ class OAIClient():
 
             generated_messages = [choice.message for choice in response.choices]
 
-            print(generated_messages)
-
             for message in generated_messages:
                 if message.tool_calls != None:
                     tool_calls = [

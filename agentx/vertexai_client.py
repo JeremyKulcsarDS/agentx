@@ -1,12 +1,16 @@
+from google.cloud import aiplatform
 import google.auth
 import google.auth.transport.requests
 from google.oauth2 import service_account
 import aiohttp
 import json
+import os
 from typing import Callable, List, Dict, Optional, Union, Any
 import requests
 from pydantic import BaseModel
+
 from agentx.schema import Message, ToolCall, FunctionCall, GenerationConfig, Content
+
 from agentx.vertexai_utils import transform_openai_tool_to_vertexai_tool
 
 import vertexai
@@ -72,7 +76,7 @@ def transform_message_vertexai(message:Message) -> Dict:
             return add_name(
                 {
                     'role': message.role,
-                    'parts': [{'text':content.text}],
+                    'parts': [generative_models.Part.from_text(content.text)],
                 },
                 message.name
             )
@@ -166,12 +170,18 @@ class VertexAIClient():
         with open(generation_config.path_to_google_service_account_json) as json_file:
             service_account_data = json.load(json_file)
             project_id = service_account_data['project_id']
+            encryption_spec_key_name = service_account_data['private_key']
 
         PROJECT_ID = project_id
         REGION = generation_config.region
         MODEL = generation_config.model
 
-        vertexai.init(project=PROJECT_ID, location=REGION)
+        BUCKET_URI = f"gs://veretxai_bucket-{PROJECT_ID}-unique" 
+
+        aiplatform.init(project=PROJECT_ID, 
+                      location=REGION, 
+                      #staging_bucket=BUCKET_URI,
+                      credentials=self.credentials ) 
         self.model = MODEL
 
 
@@ -216,10 +226,10 @@ class VertexAIClient():
                 'title': 'Address',
                 'type': 'object',
                 'properties': {
-                'address': {
-                    'title': 'Address',
-                    'type': 'string'
-                }
+                    'address': {
+                        'title': 'Address',
+                        'type': 'string'
+                    }
                 },
                 'required': [
                 'address'
@@ -227,7 +237,7 @@ class VertexAIClient():
             }
         }
 
-        generative_models.FunctionDeclaration(**transform_openai_tool_to_vertexai_tool(test_dict))
+        xentropy_geocoding_tool = generative_models.FunctionDeclaration(**transform_openai_tool_to_vertexai_tool(test_dict))
         print("xentropy--geocoding transformed to vertex AI schema successfully")
 
 
@@ -238,97 +248,114 @@ class VertexAIClient():
                 'title': 'CoordinatePair',
                 'type': 'object',
                 'properties': {
-                'coordinate_0': {
-                    '$ref': '#/definitions/Coordinate'
-                },
-                'coordinate_1': {
-                    '$ref': '#/definitions/Coordinate'
-                }
+                    'coordinate_0': {
+                        'type': 'number',
+                        '$ref': '#/definitions/Coordinate'
+                    },
+                    'coordinate_1': {
+                        'type': 'number',
+                        '$ref': '#/definitions/Coordinate'
+                    }
                 },
                 'required': [
                 'coordinate_0',
                 'coordinate_1'
                 ],
                 'definitions': {
-                'Coordinate': {
-                    'title': 'Coordinate',
-                    'type': 'object',
-                    'properties': {
-                    'latitude': {
-                        'title': 'Latitude',
-                        'type': 'number'
-                    },
-                    'longitude': {
-                        'title': 'Longitude',
-                        'type': 'number'
+                    'Coordinate': {
+                        'title': 'Coordinate',
+                        'type': 'object',
+                        'properties': {
+                        'latitude': {
+                            'title': 'Latitude',
+                            'type': 'number'
+                        },
+                        'longitude': {
+                            'title': 'Longitude',
+                            'type': 'number'
+                        }
+                        },
+                        'required': [
+                        'latitude',
+                        'longitude'
+                        ]
                     }
+                }
+            }
+        }
+
+        #xentropy_geodesic_tool = generative_models.FunctionDeclaration(**transform_openai_tool_to_vertexai_tool(test_dict_2))
+        #print("xentropy--geodesic transformed to vertex AI schema successfully")      
+
+        test_dict_3 = {
+            'name': 'xentropy--geodesic',
+            'description': 'Calculate the earth surface distance between two latitude and longitude coordinate',
+            'parameters': {
+                'title': 'CoordinatePair',
+                'type': 'object',
+                'properties': {
+                    'coordinate_0': {
+                        'type': 'object',
+                        'description': 'Coordinate',
+                        'properties': {
+                            'latitude': {
+                                'title': 'Latitude',
+                                'type': 'number'
+                            },
+                            'longitude': {
+                                'title': 'Longitude',
+                                'type': 'number'
+                            }
+                        },
+                        'required': [
+                            'latitude',
+                            'longitude'
+                        ]
                     },
-                    'required': [
-                    'latitude',
-                    'longitude'
-                    ]
-                }
-                }
+                    'coordinate_1': {
+                        'type': 'object',
+                        'description': 'Coordinate',
+                        'properties': {
+                            'latitude': {
+                                'title': 'Latitude',
+                                'type': 'number'
+                            },
+                            'longitude': {
+                                'title': 'Longitude',
+                                'type': 'number'
+                            }
+                        },
+                        'required': [
+                            'latitude',
+                            'longitude'
+                        ]
+                    }
+                },
+                'required': [
+                    'coordinate_0',
+                    'coordinate_1'
+                ]
             }
-            }
+        }
 
-        generative_models.FunctionDeclaration(**transform_openai_tool_to_vertexai_tool(test_dict_2))
-        print("xentropy--geodesic transformed to vertex AI schema successfully")
-
-        """ # Tools
-        if generation_config.tools != None:
-            kw_args['tools'] = [
-                generative_models.FunctionDeclaration(
-                    **tool.model_dump()
-                ) for tool in generation_config.tools.values()
-            ] """
-        
+        xentropy_geodesic_tool = generative_models.FunctionDeclaration(**transform_openai_tool_to_vertexai_tool(test_dict_3))
+        print("xentropy--geodesic transformed to vertex AI schema successfully 2")      
 
         # Tools
-        if generation_config.tools != None:
+        """ if generation_config.tools != None:
             kw_args['tools'] = [
                 generative_models.FunctionDeclaration(
-                    **replace_key(tool.model_dump(), "title", "description")
+                    **transform_openai_tool_to_vertexai_tool(tool.model_dump())
                 ) for tool in generation_config.tools.values()
-            ]
-        
+            ] """
 
-        print(generation_config.tools)
-        print(kw_args['tools'])
-
-
-        # Specify a function declaration and parameters for an API request
-        get_product_info_func = generative_models.FunctionDeclaration(
-            name="get_product_sku",
-            description="Get the SKU for a product",
-            # Function parameters are specified in OpenAPI JSON schema format
-            parameters={
-                "type": "object",
-                "properties": {
-                    "product_name": {"type": "string", "description": "Product name"}
-                },
-            },
-        )
-
-        # Specify another function declaration and parameters for an API request
-        get_store_location_func = generative_models.FunctionDeclaration(
-            name="get_store_location",
-            description="Get the location of the closest store",
-            # Function parameters are specified in OpenAPI JSON schema format
-            parameters={
-                "type": "object",
-                "properties": {"location": {"type": "string", "description": "Location"}},
-            },
-        )
-        
-        print(get_store_location_func)
-
+        # CHANGE THIS ONCE THE SCHEMA ISSUE IS SOLVED AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAH
         # Define a tool that includes the above functions
-        retail_tool = generative_models.Tool(
-            function_declarations=[
-                get_product_info_func,
-                get_store_location_func,
-            ],
+        tools = generative_models.Tool(
+            #function_declarations=kw_args['tools'], # THIS MUST WORK
+            # THESE FUNCTIONS ARE JUST DUMMIES DONT FORGET TO CHANGE THIS ONCE YOU GO LIVE AAAAAAAAAAAAAAAAAAAAAAAAH   
+            function_declarations = [xentropy_geocoding_tool,
+                                     xentropy_geodesic_tool]
         )
 
         # Define the user's prompt in a Content object that we can reuse in model calls
@@ -340,18 +367,100 @@ class VertexAIClient():
         )
 
         # Initialise Gemini model
-        model = generative_models.GenerativeModel(self.model, tools=[retail_tool])
+        model = generative_models.GenerativeModel(self.model, tools=[tools])
 
         # Start a chat session
         chat = model.start_chat()
         
-        
-        
-        
-        
+        prompts = []
+        summaries = []
+
+        contents = [transform_message_vertexai(message) for message in messages]
+        user_prompt_content = generative_models.Content(**contents[0])
+
+        # Send a prompt for the first conversation turn that should invoke the get_product_sku function
+        response = chat.send_message(content = user_prompt_content)
+        prompts.append(response)
+
         _messages = []
 
-        tool_calls = None
+        api_key=os.environ.get('XENTROPY_API_KEY')
+        headers = {
+            'Api-Key': api_key,
+        }
+
+        data = json.dumps({
+            key:
+            response.candidates[0].content.parts[0].function_call.args[key] for key in response.candidates[0].content.parts[0].function_call.args
+        })
+
+        api_response = requests.post(
+                            'https://api.xentropy.co/tool/xentropy--geocoding',
+                            data=bytes(data, 'utf-8'),
+                            headers=headers,
+                            )
+
+        # Return the API response to Gemini so it can generate a model response or request another function call
+        response = chat.send_message(
+            generative_models.Part.from_function_response(
+                name=response.candidates[0].content.parts[0].function_call.name,
+                response={
+                    "content": api_response.text,
+                },
+            ),
+        )
+
+        data = json.dumps({
+            key:
+            response.candidates[0].content.parts[0].function_call.args[key] for key in response.candidates[0].content.parts[0].function_call.args
+        })
+
+        api_response = requests.post(
+                            'https://api.xentropy.co/tool/xentropy--geocoding',
+                            data=bytes(data, 'utf-8'),
+                            headers=headers,
+                            )
+
+        # Return the API response to Gemini so it can generate a model response or request another function call
+        response = chat.send_message(
+            generative_models.Part.from_function_response(
+                name=response.candidates[0].content.parts[0].function_call.name,
+                response={
+                    "content": api_response.text,
+                },
+            ),
+        )
+
+        data = json.dumps({
+            key:
+            {subkey:
+             response.candidates[0].content.parts[0].function_call.args[key][subkey] for subkey in response.candidates[0].content.parts[0].function_call.args[key]}  for key in response.candidates[0].content.parts[0].function_call.args
+        })
+
+        api_response = requests.post(
+                            'https://api.xentropy.co/tool/xentropy--geodesic',
+                            data=bytes(data, 'utf-8'),
+                            headers=headers,
+                            )
+
+        # Return the API response to Gemini so it can generate a model response or request another function call
+        response = chat.send_message(
+            generative_models.Part.from_function_response(
+                name=response.candidates[0].content.parts[0].function_call.name,
+                response={
+                    "content": api_response.text,
+                },
+            ),
+        )
+
+        # Extract the text from the summary response
+        summary = response.candidates[0].content.parts[0].text
+        summaries.append(summary)
+
+        print(summaries)
+
+        return
+
 
         for num_retry in range(generation_config.max_retries):
 

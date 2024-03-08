@@ -10,7 +10,8 @@ GAPIC_SCHEMA_FIELDS = [
     "enum", 
     "properties", 
     "required", 
-    "example"
+    "example",
+    "$ref"
 ]
 
 
@@ -44,7 +45,6 @@ def move_extra_fields_to_properties(dictionary: Dict[str, Any], gapic_schema_fie
     """
     Moves any field outside the "parameters" key that is in the GAPIC schema inside the "properties" field.
     https://cloud.google.com/vertex-ai/docs/reference/rpc/google.cloud.aiplatform.v1beta1#google.cloud.aiplatform.v1beta1.Schema
-    Updates the "required" list with the newly added properties.
 
     Args:
         dictionary (dict): The input dictionary.
@@ -62,10 +62,6 @@ def move_extra_fields_to_properties(dictionary: Dict[str, Any], gapic_schema_fie
             popped_key = dictionary_copy["parameters"].pop(key)
             dictionary_copy["parameters"]["properties"].update(popped_key)
             del popped_key
-
-    for key in dictionary_copy["parameters"]["properties"].keys():
-        if key not in dictionary_copy["parameters"]["required"]:
-            dictionary_copy["parameters"]["required"].append(key)
 
     return dictionary_copy
 
