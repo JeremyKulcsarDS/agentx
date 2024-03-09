@@ -60,16 +60,7 @@ def transform_message_vertexai(message:Message) -> Dict:
     Returns:
         Dict: The transformed message dictionary.
     """
-    if message.role == 'system':
-        content = message.content
-        return add_name(
-            {
-                'role': message.role,
-                'parts': [{'text':content.text}],
-                },
-            None
-        )
-    
+
     if message.role == 'user':
         content = message.content
         if content.files is None and content.urls is None and content.tool_calls is None and content.tool_response is None:
@@ -84,6 +75,7 @@ def transform_message_vertexai(message:Message) -> Dict:
         pass
 
     if message.role == 'model':
+        print(message)
         tool_calls = message.content.tool_calls
         if tool_calls is not None:
             print("tool_content:", content)
@@ -219,7 +211,7 @@ class VertexAIClient():
             kw_args['model'] = generation_config.model
 
 
-        test_dict = {
+        test_dict_geocoding = {
             'name': 'xentropy--geocoding',
             'description': 'Retrieve the latitude and longitude given an address using the highly accurate Google Map API.',
             'parameters': {
@@ -237,57 +229,7 @@ class VertexAIClient():
             }
         }
 
-        xentropy_geocoding_tool = generative_models.FunctionDeclaration(**transform_openai_tool_to_vertexai_tool(test_dict))
-        print("xentropy--geocoding transformed to vertex AI schema successfully")
-
-
-        test_dict_2 = {
-            'name': 'xentropy--geodesic',
-            'description': 'Calculate the earth surface distance between two latitude and longitude coordinate',
-            'parameters': {
-                'title': 'CoordinatePair',
-                'type': 'object',
-                'properties': {
-                    'coordinate_0': {
-                        'type': 'number',
-                        '$ref': '#/definitions/Coordinate'
-                    },
-                    'coordinate_1': {
-                        'type': 'number',
-                        '$ref': '#/definitions/Coordinate'
-                    }
-                },
-                'required': [
-                'coordinate_0',
-                'coordinate_1'
-                ],
-                'definitions': {
-                    'Coordinate': {
-                        'title': 'Coordinate',
-                        'type': 'object',
-                        'properties': {
-                        'latitude': {
-                            'title': 'Latitude',
-                            'type': 'number'
-                        },
-                        'longitude': {
-                            'title': 'Longitude',
-                            'type': 'number'
-                        }
-                        },
-                        'required': [
-                        'latitude',
-                        'longitude'
-                        ]
-                    }
-                }
-            }
-        }
-
-        #xentropy_geodesic_tool = generative_models.FunctionDeclaration(**transform_openai_tool_to_vertexai_tool(test_dict_2))
-        #print("xentropy--geodesic transformed to vertex AI schema successfully")      
-
-        test_dict_3 = {
+        test_dict_geodesic = {
             'name': 'xentropy--geodesic',
             'description': 'Calculate the earth surface distance between two latitude and longitude coordinate',
             'parameters': {
@@ -338,8 +280,8 @@ class VertexAIClient():
             }
         }
 
-        xentropy_geodesic_tool = generative_models.FunctionDeclaration(**transform_openai_tool_to_vertexai_tool(test_dict_3))
-        print("xentropy--geodesic transformed to vertex AI schema successfully 2")      
+        xentropy_geocoding_tool = generative_models.FunctionDeclaration(**transform_openai_tool_to_vertexai_tool(test_dict_geocoding))  
+        xentropy_geodesic_tool = generative_models.FunctionDeclaration(**transform_openai_tool_to_vertexai_tool(test_dict_geodesic))   
 
         # Tools
         """ if generation_config.tools != None:
@@ -358,106 +300,112 @@ class VertexAIClient():
                                      xentropy_geodesic_tool]
         )
 
-        # Define the user's prompt in a Content object that we can reuse in model calls
-        user_prompt_content = generative_models.Content(
-            role="user",
-            parts=[
-                generative_models.Part.from_text("test"),
-            ],
-        )
-
         # Initialise Gemini model
         model = generative_models.GenerativeModel(self.model, tools=[tools])
 
-        # Start a chat session
-        chat = model.start_chat()
-        
-        prompts = []
-        summaries = []
-
-        contents = [transform_message_vertexai(message) for message in messages]
-        user_prompt_content = generative_models.Content(**contents[0])
-
-        # Send a prompt for the first conversation turn that should invoke the get_product_sku function
-        response = chat.send_message(content = user_prompt_content)
-        prompts.append(response)
-
-        _messages = []
-
+        # api keyuy elements
         api_key=os.environ.get('XENTROPY_API_KEY')
         headers = {
             'Api-Key': api_key,
         }
 
-        data = json.dumps({
-            key:
-            response.candidates[0].content.parts[0].function_call.args[key] for key in response.candidates[0].content.parts[0].function_call.args
-        })
+        # Start a chat session
+        chat = model.start_chat()
 
-        api_response = requests.post(
-                            'https://api.xentropy.co/tool/xentropy--geocoding',
-                            data=bytes(data, 'utf-8'),
-                            headers=headers,
+        while True:
+            if messages[-1].role == 'user':
+                print('first msg')
+                contents = [transform_message_vertexai(message) for message in messages]
+                user_prompt_content = generative_models.Content(**contents[0])
+
+                # Send a prompt for the first conversation turn that should invoke the function
+                response = chat.send_message(content = user_prompt_content)
+
+                messages = [Message(
+                                role=response.candidates[0].content.role,
+                                content=Content(
+                                    text="no text",
+                                ),
+                            )]
+                # check if response contains tool or not. if yes, return the tool thing, otherwise return message
+
+
+
+            # That means the model returned a text answer
+            try:  
+                if messages[-1].role == 'model' and hasattr(response.candidates[0].content.parts[0], 'text'):
+                    print("msg")
+                    content = Content(
+                        text=response.candidates[0].content.parts[0].text,
+                    )
+                    try:
+                        messages = Message(
+                                role=response.candidates[0].content.role,
+                                content=content,
                             )
+                    except:
+                        pass
+                    
+                    return messages
+                
 
-        # Return the API response to Gemini so it can generate a model response or request another function call
-        response = chat.send_message(
-            generative_models.Part.from_function_response(
-                name=response.candidates[0].content.parts[0].function_call.name,
-                response={
-                    "content": api_response.text,
-                },
-            ),
-        )
 
-        data = json.dumps({
-            key:
-            response.candidates[0].content.parts[0].function_call.args[key] for key in response.candidates[0].content.parts[0].function_call.args
-        })
 
-        api_response = requests.post(
-                            'https://api.xentropy.co/tool/xentropy--geocoding',
-                            data=bytes(data, 'utf-8'),
-                            headers=headers,
-                            )
 
-        # Return the API response to Gemini so it can generate a model response or request another function call
-        response = chat.send_message(
-            generative_models.Part.from_function_response(
-                name=response.candidates[0].content.parts[0].function_call.name,
-                response={
-                    "content": api_response.text,
-                },
-            ),
-        )
 
-        data = json.dumps({
-            key:
-            {subkey:
-             response.candidates[0].content.parts[0].function_call.args[key][subkey] for subkey in response.candidates[0].content.parts[0].function_call.args[key]}  for key in response.candidates[0].content.parts[0].function_call.args
-        })
+                    response = chat.send_message(
+                        generative_models.Content(
+                            role = response.candidates[0].content.role,
+                            parts = [
+                                generative_models.Part.from_text(
+                                    response.candidates[0].content.parts[0].text
+                                )
+                            ]
+                        )
+                    )
+            except ValueError:
+                pass
 
-        api_response = requests.post(
-                            'https://api.xentropy.co/tool/xentropy--geodesic',
-                            data=bytes(data, 'utf-8'),
-                            headers=headers,
-                            )
 
-        # Return the API response to Gemini so it can generate a model response or request another function call
-        response = chat.send_message(
-            generative_models.Part.from_function_response(
-                name=response.candidates[0].content.parts[0].function_call.name,
-                response={
-                    "content": api_response.text,
-                },
-            ),
-        )
+            # Otherwise, he is returning a function call
+            if messages[-1].role == 'model' and str(response.candidates[0].content.parts[0].function_call) is not None:
+                print("func call")
+                data = json.dumps(
+                        {
+                        key: (
+                            response.candidates[0].content.parts[0].function_call.args[key]
+                            if isinstance(response.candidates[0].content.parts[0].function_call.args[key], str)
+                            else {
+                                subkey:
+                                response.candidates[0].content.parts[0].function_call.args[key][subkey] for subkey in response.candidates[0].content.parts[0].function_call.args[key]
+                            }
+                        )
+                        for key in response.candidates[0].content.parts[0].function_call.args
+                    }
+                )
+                
+                # Send the data to the API
+                api_response = requests.post(
+                                    f'https://api.xentropy.co/tool/xentropy--{response.candidates[0].content.parts[0].function_call.name}',
+                                    data=bytes(data, 'utf-8'),
+                                    headers=headers,
+                                    )
+
+                # Return the API response to Gemini so it can generate a model response or request another function call
+                response = chat.send_message(
+                    generative_models.Part.from_function_response(
+                        name=response.candidates[0].content.parts[0].function_call.name,
+                        response={
+                            "content": api_response.text,
+                        },
+                    ),
+                )
+
+        print(response)
 
         # Extract the text from the summary response
         summary = response.candidates[0].content.parts[0].text
         summaries.append(summary)
-
-        print(summaries)
 
         return
 
