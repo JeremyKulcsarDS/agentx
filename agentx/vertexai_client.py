@@ -13,7 +13,6 @@ from agentx.schema import Message, ToolCall, FunctionCall, GenerationConfig, Con
 
 from agentx.vertexai_utils import transform_openai_tool_to_vertexai_tool
 
-import vertexai
 from vertexai import generative_models
 
 VERTEXAI_API_KW = [
@@ -162,19 +161,13 @@ class VertexAIClient():
         with open(generation_config.path_to_google_service_account_json) as json_file:
             service_account_data = json.load(json_file)
             project_id = service_account_data['project_id']
-            encryption_spec_key_name = service_account_data['private_key']
 
         PROJECT_ID = project_id
         REGION = generation_config.region
-        MODEL = generation_config.model
-
-        BUCKET_URI = f"gs://veretxai_bucket-{PROJECT_ID}-unique" 
 
         aiplatform.init(project=PROJECT_ID, 
                       location=REGION, 
-                      #staging_bucket=BUCKET_URI,
                       credentials=self.credentials ) 
-        self.model = MODEL
 
 
     def generate(
@@ -185,22 +178,8 @@ class VertexAIClient():
             output_model:BaseModel = None,
         ) -> Union[Message, List[Message], None]:
 
-        # kwargs
+        # kwargs (to be adapted later)
         kw_args = {key:value for key, value in generation_config.model_dump().items() if value != None and key in VERTEXAI_API_KW}
-
-        # Check schema constraints
-        if output_model != None:
-            messages.append(
-                Message(
-                    role='user',
-                    content=Content(
-                        text='You must return a JSON object according to this json schema. {schema}'.format(
-                            schema = output_model.model_json_schema() 
-                        )
-                    )
-                )
-            )
-            kw_args['response_format'] = {'type':'json_object'}
 
         # Creds management
         if not self.credentials.valid:
@@ -210,7 +189,10 @@ class VertexAIClient():
         if generation_config.api_type == 'vertexai':
             kw_args['model'] = generation_config.model
 
-
+        # =========================================================================================================================
+        # =================================== WAITING FOR SCHEMA ISSUE TO BE FIXED TO BE USABLE ===================================
+            
+        # Creating dummy variables as the current tools are stored with a wrongful schema
         test_dict_geocoding = {
             'name': 'xentropy--geocoding',
             'description': 'Retrieve the latitude and longitude given an address using the highly accurate Google Map API.',
@@ -282,8 +264,8 @@ class VertexAIClient():
 
         xentropy_geocoding_tool = generative_models.FunctionDeclaration(**transform_openai_tool_to_vertexai_tool(test_dict_geocoding))  
         xentropy_geodesic_tool = generative_models.FunctionDeclaration(**transform_openai_tool_to_vertexai_tool(test_dict_geodesic))   
-
-        # Tools
+        
+        # Once the schema issue is solved, this will be uncommented 
         """ if generation_config.tools != None:
             kw_args['tools'] = [
                 generative_models.FunctionDeclaration(
@@ -291,17 +273,23 @@ class VertexAIClient():
                 ) for tool in generation_config.tools.values()
             ] """
 
-        # CHANGE THIS ONCE THE SCHEMA ISSUE IS SOLVED AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAH
-        # Define a tool that includes the above functions
-        tools = generative_models.Tool(
-            #function_declarations=kw_args['tools'], # THIS MUST WORK
-            # THESE FUNCTIONS ARE JUST DUMMIES DONT FORGET TO CHANGE THIS ONCE YOU GO LIVE AAAAAAAAAAAAAAAAAAAAAAAAH   
-            function_declarations = [xentropy_geocoding_tool,
-                                     xentropy_geodesic_tool]
-        )
+        if generation_config.tools is not None:
+            # Define a tool that includes the above functions
+            tools = generative_models.Tool(
+                #function_declarations=kw_args['tools'], # THIS MUST WORK
+                # These functions are just dummies. After the schema issue is solved, this will turn into what is seen above. =====
+                function_declarations = [xentropy_geocoding_tool,
+                                        xentropy_geodesic_tool]
+            )
 
-        # Initialise Gemini model
-        model = generative_models.GenerativeModel(self.model, tools=[tools])
+            # Initialise Gemini model
+            model = generative_models.GenerativeModel(kw_args['model'], tools=[tools])
+        else:
+            # Initialise Gemini model
+            model = generative_models.GenerativeModel(kw_args['model'], tools=None)
+
+        # =================================== WAITING FOR SCHEMA ISSUE TO BE FIXED TO BE USABLE ===================================
+        # =========================================================================================================================
 
         # api keyuy elements
         api_key=os.environ.get('XENTROPY_API_KEY')
@@ -313,307 +301,110 @@ class VertexAIClient():
         chat = model.start_chat()
 
         while True:
+            # Check if the message role is user. Indicates the first message of the session
+            # Gemini can only do sequential turns between user and model, so if it isn't a user message it is a response.
             if messages[-1].role == 'user':
-                print('first msg')
-                contents = [transform_message_vertexai(message) for message in messages]
-                user_prompt_content = generative_models.Content(**contents[0])
+                # Make the content readable by the API
+                contents = transform_message_vertexai(messages[-1])
+                user_prompt_content = generative_models.Content(**contents)
 
                 # Send a prompt for the first conversation turn that should invoke the function
                 response = chat.send_message(content = user_prompt_content)
 
-                messages = [Message(
-                                role=response.candidates[0].content.role,
-                                content=Content(
-                                    text="no text",
-                                ),
-                            )]
-                # check if response contains tool or not. if yes, return the tool thing, otherwise return message
+                # If the response indicates a function call procedure
+                if response.candidates[0].content.parts[0].function_call.args is not None:
+                    # Keep looping until Gemini is done doing his function call work
+                    while response.candidates[0].content.role == 'model' and response.candidates[0].content.parts[0].function_call.args is not None:
+                        # {arg_name: arg_value} dictionary. 
+                        # Sometimes an argument can have multiple values, so it will become a dict of dict. {arg_name: {arg_1: arg_1_value, arg_2: arg_2_value}}
+                        args_dict = {
+                            key: (
+                                response.candidates[0].content.parts[0].function_call.args[key]
+                                if isinstance(response.candidates[0].content.parts[0].function_call.args[key], str) # if string, then no nest in the response object
+                                else {
+                                    subkey:
+                                    response.candidates[0].content.parts[0].function_call.args[key][subkey] for subkey in response.candidates[0].content.parts[0].function_call.args[key]
+                                }
+                            )
+                            for key in response.candidates[0].content.parts[0].function_call.args
+                        }
 
+                        # Dump it for the API call
+                        data = json.dumps(args_dict)
 
+                        # =========================================================================================================================
+                        # =================================== CHANGE TO SUPPORT NON XENTROPY APIsIN FUTURE VERSION ================================
 
-            # That means the model returned a text answer
-            try:  
-                if messages[-1].role == 'model' and hasattr(response.candidates[0].content.parts[0], 'text'):
-                    print("msg")
+                        # Send the data to the API
+                        api_response = requests.post(
+                                            f'https://api.xentropy.co/tool/xentropy--{response.candidates[0].content.parts[0].function_call.name}',
+                                            data=bytes(data, 'utf-8'),
+                                            headers=headers,
+                                            )
+                        
+                        # =================================== CHANGE TO SUPPORT NON XENTROPY APIsIN FUTURE VERSION ================================
+                        # =========================================================================================================================
+
+                        # Return the API response to Gemini so it can generate a model response or request another function call
+                        response = chat.send_message(
+                            generative_models.Part.from_function_response(
+                                name=response.candidates[0].content.parts[0].function_call.name,
+                                response={
+                                    "content": api_response.text,
+                                },
+                            ),
+                        )
+
+                        # This might be useful later, keep it here
+                        """if response.candidates[0].content.parts[0].function_call.args is not None:
+                            tool_calls.append(
+                                    ToolCall(
+                                    type="tools_call",
+                                    function_call = FunctionCall(
+                                        name = response.candidates[0].content.parts[0].function_call.name.lower(), 
+                                        arguments = str(args_dict)
+                                    )
+                                )
+                            )
+                        else:
+                            pass""" 
+                        
+                    # Return a message object and append it to the list for the loop
+                    messages.append(Message(
+                                    role=response.candidates[0].content.role,
+                                    content=Content(
+                                        text="func calls done", # arbitrary value, but will serve for the last check
+                                    ),
+                                )
+                            )
+                    
+                # If no function call, directly return the answer
+                else:
                     content = Content(
                         text=response.candidates[0].content.parts[0].text,
                     )
-                    try:
-                        messages = Message(
-                                role=response.candidates[0].content.role,
-                                content=content,
-                            )
-                    except:
-                        pass
-                    
-                    return messages
-                
 
-
-
-
-
-                    response = chat.send_message(
-                        generative_models.Content(
-                            role = response.candidates[0].content.role,
-                            parts = [
-                                generative_models.Part.from_text(
-                                    response.candidates[0].content.parts[0].text
-                                )
-                            ]
-                        )
-                    )
-            except ValueError:
-                pass
-
-
-            # Otherwise, he is returning a function call
-            if messages[-1].role == 'model' and str(response.candidates[0].content.parts[0].function_call) is not None:
-                print("func call")
-                data = json.dumps(
-                        {
-                        key: (
-                            response.candidates[0].content.parts[0].function_call.args[key]
-                            if isinstance(response.candidates[0].content.parts[0].function_call.args[key], str)
-                            else {
-                                subkey:
-                                response.candidates[0].content.parts[0].function_call.args[key][subkey] for subkey in response.candidates[0].content.parts[0].function_call.args[key]
-                            }
-                        )
-                        for key in response.candidates[0].content.parts[0].function_call.args
-                    }
-                )
-                
-                # Send the data to the API
-                api_response = requests.post(
-                                    f'https://api.xentropy.co/tool/xentropy--{response.candidates[0].content.parts[0].function_call.name}',
-                                    data=bytes(data, 'utf-8'),
-                                    headers=headers,
-                                    )
-
-                # Return the API response to Gemini so it can generate a model response or request another function call
-                response = chat.send_message(
-                    generative_models.Part.from_function_response(
-                        name=response.candidates[0].content.parts[0].function_call.name,
-                        response={
-                            "content": api_response.text,
-                        },
-                    ),
-                )
-
-        print(response)
-
-        # Extract the text from the summary response
-        summary = response.candidates[0].content.parts[0].text
-        summaries.append(summary)
-
-        return
-
-
-        for num_retry in range(generation_config.max_retries):
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-            contents = [transform_message_vertexai(message) for message in messages]
-
-            request_body = {
-                "contents": contents,
-                "tools": tool_calls,
-                "generationConfig": {
-                    #"temperature": generation_config.temperature,
-                    #"topP": generation_config.top_p,
-                    #"topK": generation_config.top_k,
-                    "candidateCount": generation_config.n_candidates,
-                    #"maxOutputTokens": generation_config.max_tokens,
-                    #"stopSequences": generation_config.stop_sequences
-                }
-            }
-
-            response = requests.post(
-                url = f'https://{REGION}-aiplatform.googleapis.com/v1/projects/{PROJECT_ID}/locations/{REGION}/publishers/google/models/{MODEL}:streamGenerateContent',
-                json=request_body,
-                headers={
-                    "Content-Type": "application/json; charset=utf-8",
-                    "Authorization": "Bearer " + self.credentials.token
-                },
-                timeout = generation_config.timeout
-            )
-
-
-
-            # generated_messages = [choice.message for choice in response.choices] adapt to vertex AI
-
-            for message in generated_messages:
-                if message.tool_calls != None:
-                    tool_calls = [
-                        ToolCall(
-                            id=tool_call.id,
-                            type=tool_call.type,
-                            function_call=FunctionCall(
-                                name=tool_call.function.name.lower(), 
-                                arguments=tool_call.function.arguments
-                            )
-                        ) for tool_call in message.tool_calls # if validate_function_call(tool_call, generation_config)
-                    ]
-                    if tool_calls == []:
-                        continue
-
-                    content = Content(
-                        tool_calls=tool_calls
-                    )
-                else:
-                    content = Content(
-                        text=message.content,
-                    )
-
-                if output_model and content.text != None:
-                    try:
-                        output_model.model_validate_json(content.text)
-                        _messages.append(
-                            Message(
-                                role='assistant',
-                                content=content,
-                            )
-                        )
-                    except:
-                        pass
-                else:
-                    _messages.append(
-                        Message(
-                            role='assistant',
+                    # Fit the message object
+                    message = Message(
+                            role=response.candidates[0].content.role,
                             content=content,
                         )
+                    
+                    return message
+
+            # That means the model returned a text answer after function calls
+            if messages[-1].role == 'model' and messages[-1].content.text == 'func calls done':
+                content = Content(
+                    text=response.candidates[0].content.parts[0].text,
+                )
+
+                # Fit the message object
+                message = Message(
+                        role=response.candidates[0].content.role,
+                        content=content,
                     )
 
-            if len(_messages) >= generation_config.n_candidates:
-                _messages = _messages[:generation_config.n_candidates]
-                break
-
-        if len(_messages) == 0:
-            return None
-        if reduce_function:
-            return reduce_function(_messages)
-        else:
-            return _messages
-
-        """         tools = generation_config.tools
-        if tools is not None:
-            tool_content = [
-                {
-                    "name": tool,
-                } for tool in generation_config.tools
-            ]
-            tools = [
-                {
-                    'functionCall': 
-                        tool_content
-                }
-            ] """
-
-        print("message:", messages)
-
-        contents = [transform_message_vertexai(message) for message in messages]
-
-        print("contents:", contents)
-
-        request_body = {
-            "contents": contents,
-            "tools": tools,
-            "generationConfig": {
-                #"temperature": generation_config.temperature,
-                #"topP": generation_config.top_p,
-                #"topK": generation_config.top_k,
-                "candidateCount": generation_config.n_candidates,
-                #"maxOutputTokens": generation_config.max_tokens,
-                #"stopSequences": generation_config.stop_sequences
-            }
-        }
-
-        print("request_body:", request_body)
-
-        # Extract project ID from the JSON file
-        with open(generation_config.path_to_google_service_account_json) as json_file:
-            service_account_data = json.load(json_file)
-            project_id = service_account_data['project_id']
-
-        PROJECT_ID = project_id
-        REGION = generation_config.region
-        MODEL = generation_config.model
-
-        response = requests.post(
-            url = f'https://{REGION}-aiplatform.googleapis.com/v1/projects/{PROJECT_ID}/locations/{REGION}/publishers/google/models/{MODEL}:streamGenerateContent',
-            json=request_body,
-            headers={
-                "Content-Type": "application/json; charset=utf-8",
-                "Authorization": "Bearer " + self.credentials.token
-            },
-            timeout = generation_config.timeout
-        )
-
-        print("response:",response.json())
-
-        # relevant for vertex AI?
-        _messages = []
-
-        try:
-
-            if 'error' in response.json()[0]:
-                if response.json()[0]['error']['code'] == 429:
-                    print(response.json()[0]['error']['message'])
-                    return None
-            
-            if response.json()[0]['candidates'][0]['content']['role'] == "model" and 'functionCall' in response.json()[0]['candidates'][0]['content']['parts'][0]:
-            
-                role = response.json()[0]['candidates'][0]['content']['role']
-
-                _messages.append(Message(role=role, content=Content(function_call=response.json()[0]['candidates'][0]['content']['parts'][0]['functionCall'])))
-
-            else:
-
-                role = response.json()[0]['candidates'][0]['content']['role']
-                text = response.json()[0]['candidates'][0]['content']['parts'][0]['text']
-
-                _messages.append(Message(role=role, content=Content(text=text)))
-
-        except json.JSONDecodeError as e:
-            # Handle JSON decoding error
-            print("Error decoding JSON from the Vertex AI POST request response:", e)
-
-        except ValueError as e:
-            # Handle other value-related errors
-            print("ValueError from the Vertex AI POST request response:", e)
-
-        except Exception as e:
-            # Handle other exceptions
-            print("Exception from the Vertex AI POST request response:", e)
-            raise e
-        
-        print("return:", _messages)
-        
-        if len(_messages) == 0:
-            return None
-        elif len(_messages) == 1:
-            return _messages[0]
-        
-        if reduce_function:
-            return reduce_function(_messages)
-        else:
-            return _messages
-        
+                return message
 
     async def a_generate(
             self, 

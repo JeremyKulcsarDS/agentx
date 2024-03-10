@@ -24,7 +24,7 @@ For more information about LLM agents we highly recommend reading this [blog](ht
   * GPT-4
   * GPT-4-Vision
   * ToolLlama-7B
-  * Gemini-Pro (currently under development -- need to handle flexible multiturns and tools with multiple arguments / with $refs)
+  * Gemini-Pro (currently under development -- Tool JSON schema issue to be fixed, everything else functional)
   * Gemini-Pro-Vision (on roadmap)
   * Claude-2 (on roadmap)
   * Claude-2.1 (on roadmap)

@@ -15,7 +15,7 @@ class File(BaseModel):
     base64Str: str
 
 class ToolCall(BaseModel):
-    id: str
+    id: Optional[str] = None
     type: str
     function_call: FunctionCall
 
