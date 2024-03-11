@@ -7,6 +7,7 @@ from time import time
 
 
 class Client():
+    url = 'https://api.xentropy.co'
 
     def __init__(
         self,
@@ -14,34 +15,11 @@ class Client():
     ):
         self.user_id = api_key.split('--')[0]
         self.api_key = api_key
-        self.endpoint = 'https://api.xentropy.co'
 
-    @classmethod
-    def create_account(cls, user_id: str, email: EmailStr):
-        response = requests.post(
-            'https://api.xentropy.co/user',
-            json={
-                'email': email,
-                'user_id': user_id
-            }
-        ).json()
-
-        return response
-
-    def reset_api_key(self, email: EmailStr):
-        response = requests.post(
-            f'{self.endpoint}/reset_api_key',
-            json={
-                'email': email,
-                'user_id': self.user_id
-            }
-        ).json()
-
-        return response
 
     def summary(self):
         response = requests.get(
-            f'{self.endpoint}/user',
+            f'{self.url}/users/',
             headers={
                 'Api-Key': self.api_key
             }
@@ -49,24 +27,16 @@ class Client():
 
         return response
 
-    def modify_tool(self, tool, key, value):
-        response = requests.put(
-            f'{self.endpoint}/tool/{tool}',
-            json={key: value},
+
+    def delete_tool(self, tool):
+        response = requests.delete(
+            f'{self.url}/tools/{tool}',
             headers={
                 'Api-Key': self.api_key
             }
         )
         return response.json()
 
-    def delete_tool(self, tool):
-        response = requests.delete(
-            f'{self.endpoint}/tool/{tool}',
-            headers={
-                'Api-Key': self.api_key
-            }
-        )
-        return response.json()
 
     def register_ethereum_address(self, account: Account):
         timestamp = int(time())
@@ -75,7 +45,7 @@ class Client():
         signature = account.sign_message(message_hash).signature.hex()
 
         response = requests.post(
-            f'{self.endpoint}/register_ethereum_address',
+            f'{self.url}/register_ethereum_address',
             json={
                 'user_id': self.user_id,
                 'address': account.address,
@@ -90,7 +60,7 @@ class Client():
 
     def stable_coin_payout(self, amount: int, address: str, stable_coin: str):
         response = requests.post(
-            f'{self.endpoint}/stable_coin_payout',
+            f'{self.url}/stable_coin_payout',
             json={
                 'amount': amount,
                 'address': address,
@@ -105,7 +75,7 @@ class Client():
 
     def transfer_payout_to_balance(self, amount: int):
         response = requests.post(
-            f'{self.endpoint}/balance_transfer',
+            f'{self.url}/balance_transfer',
             params={
                 'amount': amount,
             },
