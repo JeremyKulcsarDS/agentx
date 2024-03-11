@@ -20,6 +20,7 @@ class StringOutput(BaseModel):
 
 
 class Tool():
+    url = 'https://api.xentropy.co'
 
     def __init__(
         self,
@@ -31,8 +32,10 @@ class Tool():
         if self.api_key == None:
             self.api_key = os.environ.get('XENTROPY_API_KEY')
 
+        self.id: Optional[str] = kwargs.get('id')
         self.name: Optional[str] = kwargs.get('name')
         self.description: Optional[str] = kwargs.get('description')
+        self.readme: Optional[str] = kwargs.get('readme')
         self.input_model: Optional[BaseModel] = kwargs.get('input_model')
         self.input_json_schema: Optional[Dict] = kwargs.get('input_json_schema')
         self.output_model: Optional[BaseModel] = kwargs.get('output_model')
@@ -50,11 +53,11 @@ class Tool():
             self.output_json_schema = self.output_model.model_json_schema()
 
     @classmethod
-    def load(cls, name, api_key):
-        tool = Tool(api_key=api_key, name=name)
+    def load(cls, id, api_key):
+        tool = Tool(api_key=api_key, id=id)
 
         response = requests.get(
-            f'https://api.xentropy.co/tool/{name}',
+            f'{cls.url}/tools/{id}',
             headers={
                 'Api-Key': api_key
             }
@@ -63,15 +66,15 @@ class Tool():
         if response.status_code != 200:
             raise Exception(response.text)
 
-        response = response.json()
+        tool_dict:Dict = response.json()
 
-        if 'exception' in response.keys():
-            raise Exception(response['exception'])
+        if 'detail' in tool_dict.keys():
+            raise Exception(tool_dict['detail'])
         
-        for key, value in response.items():
+        for key, value in tool_dict.items():
             if key in ['input_model', 'output_model']:
                 path = dirname(__file__)
-                filename = name.replace('--', '_')
+                filename = id
                 with open(f'{path}/models/{filename}_{key}.py', 'w') as f:
                     f.write(value)
                 module = reload(agentx.models)
@@ -88,10 +91,12 @@ class Tool():
 
         return tool
 
-    def publish(self, webhook_secret: Optional[str] = None, public=True):
+
+    def publish(self, api_key: Optional[str] = None, webhook_secret: Optional[str] = None, public=True):
+        self.api_key = api_key
         # create a random webhook_secret if not given
         if webhook_secret == None:
-            webhook_secret = sha256(uuid.uuid4().bytes).hexdigest()
+            webhook_secret = uuid.uuid4().hex
 
         assert (self.input_model != None)
         self.input_json_schema = self.input_model.model_json_schema()
@@ -101,10 +106,11 @@ class Tool():
             self.output_json_schema = self.output_model.model_json_schema()
 
         response = requests.post(
-            f'https://api.xentropy.co/tool',
+            f'{self.url}/tools/',
             json={
                 'name': self.name,
                 'description': self.description,
+                'readme': self.readme,
                 'input_json_schema': json.dumps(self.input_json_schema),
                 'output_json_schema': json.dumps(self.output_json_schema),
                 'endpoint': self.endpoint,
@@ -114,24 +120,25 @@ class Tool():
                 'webhook_secret': webhook_secret,
                 'public': public
             },
-            headers={'Api-Key': self.api_key}
+            headers={'Api-Key': self.api_key},
         )
         if response.status_code == 200:
             res = response.json()
             name = res['name']
             webhook_secret = res['webhook_secret']
             print(
-                f'Tool {name} is successfully published, and its webhook_secret is {webhook_secret}. You can access it by Tool.load("{name}").')
+                f'Tool {name} is successfully published. You can access it by Tool.load("{name}").')
             return {'name': name, 'webhook_secret': webhook_secret}
         else:
             return response.json()
+
 
     def run(
         self,
         *args,
         **kwargs
     ) -> str:
-        url = f'https://api.xentropy.co/tool/{self.name}'
+        url = f'{self.url}/tools/{self.id}'
 
         # build headers
         parent_id = kwargs.pop('parent_id', None)
@@ -155,16 +162,17 @@ class Tool():
         response = resp.json()
         status = response.get('status')
         if status >= 300:
-            raise Exception(response.get('error_message'))
+            raise Exception(response.get('response'))
 
         return response.get('response')
+
 
     async def a_run(
         self,
         *args,
         **kwargs,
     ) -> str:
-        url = f'https://api.xentropy.co/tool/{self.name}'
+        url = f'{self.url}/tools/{self.id}'
 
         # build headers
         headers = {
@@ -190,6 +198,6 @@ class Tool():
 
                 status = response.get('status')
                 if status >= 300:
-                    raise Exception(response.get('error_message'))
+                    raise Exception(response.get('detail'))
 
                 return response.get('response')
