@@ -14,3 +14,4 @@ google-auth~=2.26.0
 uvicorn~=0.26.0
 pyautogen~=0.2.7
 rich~=13.7.0
+google-cloud-aiplatform
