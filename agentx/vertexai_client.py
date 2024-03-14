@@ -30,9 +30,8 @@ VERTEXAI_API_KW = [
     'tools',
     'top_p'
 ]
-# ================================================================================
-# UNDER DEVELOPMENT ==============================================================
-# ================================================================================
+
+
 def add_name(message:Dict, name:Optional[str]=None) -> Dict:
     """
     Adds a 'name' key-value pair to the given message dictionary.
@@ -49,7 +48,7 @@ def add_name(message:Dict, name:Optional[str]=None) -> Dict:
     return message
 
 
-def transform_message_vertexai(message:Message) -> Dict:
+def transform_message_vertexai(message:Message) -> Union[Dict, generative_models.Content]:
     """
     Transforms a message for the Vertex AI system.
 
@@ -109,6 +108,7 @@ def transform_message_vertexai(message:Message) -> Dict:
 class VertexAIClient():
 
     def __init__(self, generation_config:GenerationConfig):
+        
         # Extract project ID from the JSON file
         with open(generation_config.path_to_google_service_account_json) as json_file:
             service_account_data = json.load(json_file)
@@ -118,6 +118,7 @@ class VertexAIClient():
         PROJECT_ID = project_id
         REGION = generation_config.region
 
+        # Works only with service account
         if account_type == "service_account":
             self.credentials = service_account.Credentials.from_service_account_file(
                 generation_config.path_to_google_service_account_json,
@@ -126,11 +127,11 @@ class VertexAIClient():
             self.auth_req = google.auth.transport.requests.Request()
             self.credentials.refresh(self.auth_req)
 
+            # Initialise the Vertex AI project
             aiplatform.init(project=PROJECT_ID, 
                       location=REGION, 
                       credentials=self.credentials ) 
         else:
-            # Raise an error
             raise ValueError("This feature only works with Google Service Accounts at the moment")
 
 
@@ -221,15 +222,16 @@ class VertexAIClient():
             }
         }
 
-        # Once the schema issue is solved, this will be uncommented 
+        # Initialise tools if there is any
         if generation_config.tools is not None:
+            
+            # Declare the functions within the tools
             kw_args['function_declaration'] = [
                 generative_models.FunctionDeclaration(
                     **transform_openai_tool_to_vertexai_tool(tool)
                 ) for tool in [test_dict_geocoding, test_dict_geodesic]
             ]
-
-        if generation_config.tools is not None:
+            
             # Define a tool that includes the above functions
             kw_args['tools'] = [
                 generative_models.Tool(
@@ -240,77 +242,89 @@ class VertexAIClient():
             ]
         else:
             kw_args['tools'] = None
+            
+        # =================================== WAITING FOR SCHEMA ISSUE TO BE FIXED TO BE USABLE ===================================
+        # =========================================================================================================================
 
         # Initialise Gemini model
         model = generative_models.GenerativeModel(kw_args['model'])
 
-        # =================================== WAITING FOR SCHEMA ISSUE TO BE FIXED TO BE USABLE ===================================
-        # =========================================================================================================================
-
+        # Initialise returned message list
         _messages = []
+        
+        # Transform AgentX messages into Vertex AI messages
         vertex_messages = [transform_message_vertexai(message) for message in messages]
-
+        
+        # Transform Vertex AI messages into Vertex AI generative_models.Content objects
         vertex_content = [generative_models.Content(**vertex_message) if type(vertex_message) is dict else vertex_message for vertex_message in vertex_messages]
 
-        # Send a prompt for the first conversation turn that should invoke the function
+        # Generate content based on the history of content
         response = model.generate_content(contents = vertex_content, tools = kw_args['tools'])
 
+        # Rename variable for lighted code
+        response_parts = response.candidates[0].content.parts[0]
+
         # If the response indicates a function call procedure
-        if response.candidates[0].content.parts[0].function_call.args is not None:
-            if len(response.candidates[0].content.parts[0].function_call.args) != 1 or 'fields' not in response.candidates[0].content.parts[0].function_call.args.keys():
-                # {arg_name: arg_value} dictionary. 
-                # Sometimes an argument can have multiple values, so it will become a dict of dict. {arg_name: {arg_1: arg_1_value, arg_2: arg_2_value}}
+        if response_parts.function_call.args is not None:
+            
+            # Make sure we don't count the trick {'fields':'fields'} as a valid condition 
+            if len(response_parts.function_call.args) != 1 or 'fields' not in response_parts.function_call.args.keys():
+                
+                # {arg_name: arg_value} dictionary. If multiple values, {arg_name: {arg_1: arg_1_value, arg_2: arg_2_value}}
                 args_dict = {
                     key: (
-                        response.candidates[0].content.parts[0].function_call.args[key]
-                        if isinstance(response.candidates[0].content.parts[0].function_call.args[key], str) # if string, then no nest in the response object
+                        response_parts.function_call.args[key]
+                        if isinstance(response_parts.function_call.args[key], str) # if string, then no nest in the response object
                         else {
                             subkey:
-                            response.candidates[0].content.parts[0].function_call.args[key][subkey] for subkey in response.candidates[0].content.parts[0].function_call.args[key]
+                            response_parts.function_call.args[key][subkey] for subkey in response_parts.function_call.args[key]
                         }
                     )
-                    for key in response.candidates[0].content.parts[0].function_call.args
+                    for key in response_parts.function_call.args
                 }
 
-                # This is due to a bug in the Google protocol
-                # It only accepts customs arguments if the first field
-                # is "fields". We add it and then remove it before calling the tool.
+                # Remove the field from the dict (cf Google Protocol bug)
                 if 'fields' in args_dict:
                     del args_dict['fields']
 
                 # Dump it for the API call
                 args_data = json.dumps(args_dict)
 
+                # Define tooi calls content
                 tool_calls = [
                     ToolCall(
-                        id=response.candidates[0].content.parts[0].function_call.name.lower(),
+                        id=response_parts.function_call.name.lower(),
                         type="function",
                         function_call=FunctionCall(
-                            name=response.candidates[0].content.parts[0].function_call.name.lower(), 
+                            name=response_parts.function_call.name.lower(), 
                             arguments=args_data
                         )
                     )
                 ]
 
+                # Set it as the content
                 content = Content(
                     tool_calls=tool_calls
                 )
             else:
-                pass
+                raise ValueError("Case {'fields':'fields}. This really shouldn't happen. Send an email to jeremy.kulcsar@diamondhill.io if it does.")
             
-        # If no function call, directly return the answer
         else:
+            # If no function call, directly return the answer as content
             content = Content(
-                text=response.candidates[0].content.parts[0].text,
+                text=response_parts.text,
             )
 
         # Fit the message object
-        _messages.append(Message(
+        _messages.append(
+            Message(
                 role=response.candidates[0].content.role,
                 content=content,
             )
         )
-                
+        
+        if len(_messages) == 0:
+            return None
         if reduce_function:
             return reduce_function(_messages)
         else:
@@ -318,46 +332,196 @@ class VertexAIClient():
         
 
     async def a_generate(
-            self, 
+            self,
             messages:List[Message],
             generation_config:GenerationConfig,
-            reduce_function:Optional[Callable[[List[Message]], Message]]=None
-    )-> Union[Message, List[Message]]:
-        if not self.credentials.valid:
-            self.credentials.refresh(self.auth_req)
-        
-        tools = generation_config.tools
-        if tools != None:
-            tools = [
-                {
-                    'functionDeclaration': tool
-                } for tool in generation_config.tools
-            ],
-        contents = [transform_message_vertexai(message) for message in messages]
-        request_body = {
-            "contents": contents,
-            "tools": tools,
-            "generationConfig": {
-                "temperature": generation_config.temperature,
-                "topP": generation_config.top_p,
-                "topK": generation_config.top_k,
-                "candidateCount": generation_config.n_candidates,
-                "maxOutputTokens": generation_config.max_tokens,
-                "stopSequences": generation_config.stop_sequences
+            reduce_function:Optional[Callable[[List[Message]], Message]]=None,
+            output_model:BaseModel = None,
+        ) -> Union[Message, List[Message], None]:
+
+        # kwargs (to be adapted later)
+        kw_args = {key:value for key, value in generation_config.model_dump().items() if value != None and key in VERTEXAI_API_KW}
+
+        # Model
+        kw_args['model'] = generation_config.model
+
+        # =========================================================================================================================
+        # =================================== WAITING FOR SCHEMA ISSUE TO BE FIXED TO BE USABLE ===================================
+
+        # Creating dummy variables as the current tools are stored with a wrongful schema
+        test_dict_geocoding = {
+            'name': 'xentropy--geocoding',
+            'description': 'Retrieve the latitude and longitude given an address using the highly accurate Google Map API.',
+            'parameters': {
+                'title': 'Address',
+                'type': 'object',
+                'properties': {
+                    'address': {
+                        'title': 'Address',
+                        'type': 'string'
+                    }
+                },
+                'required': [
+                'address'
+                ]
             }
         }
 
-        REGION = generation_config.region
-        PROJECT_ID = generation_config.project_id
-        MODEL = generation_config.model
+        test_dict_geodesic = {
+            'name': 'xentropy--geodesic',
+            'description': 'Calculate the earth surface distance between two latitude and longitude coordinate',
+            'parameters': {
+                'title': 'CoordinatePair',
+                'type': 'object',
+                'properties': {
+                    'coordinate_0': {
+                        'type': 'object',
+                        'description': 'Coordinate',
+                        'properties': {
+                            'latitude': {
+                                'title': 'Latitude',
+                                'type': 'number'
+                            },
+                            'longitude': {
+                                'title': 'Longitude',
+                                'type': 'number'
+                            }
+                        },
+                        'required': [
+                            'latitude',
+                            'longitude'
+                        ]
+                    },
+                    'coordinate_1': {
+                        'type': 'object',
+                        'description': 'Coordinate',
+                        'properties': {
+                            'latitude': {
+                                'title': 'Latitude',
+                                'type': 'number'
+                            },
+                            'longitude': {
+                                'title': 'Longitude',
+                                'type': 'number'
+                            }
+                        },
+                        'required': [
+                            'latitude',
+                            'longitude'
+                        ]
+                    }
+                },
+                'required': [
+                    'coordinate_0',
+                    'coordinate_1'
+                ]
+            }
+        }
 
-        async with aiohttp.ClientSession() as session:
-            async with session.post(
-                url=f'https://{REGION}-aiplatform.googleapis.com/v1/projects/{PROJECT_ID}/locations/{REGION}/publishers/google/models/{MODEL}:streamGenerateContent',
-                json=request_body,
-                headers={
-                    "Content-Type": "application/json; charset=utf-8",
-                    "Authorization": "Bearer " + self.credentials.token
+        # Initialise tools if there is any
+        if generation_config.tools is not None:
+            
+            # Declare the functions within the tools
+            kw_args['function_declaration'] = [
+                generative_models.FunctionDeclaration(
+                    **transform_openai_tool_to_vertexai_tool(tool)
+                ) for tool in [test_dict_geocoding, test_dict_geodesic]
+            ]
+            
+            # Define a tool that includes the above functions
+            kw_args['tools'] = [
+                generative_models.Tool(
+                    #function_declarations=kw_args['tools'], # THIS MUST WORK
+                    # These functions are just dummies. After the schema issue is solved, this will turn into what is seen above. =====
+                    function_declarations = kw_args['function_declaration']
+                )
+            ]
+        else:
+            kw_args['tools'] = None
+            
+        # =================================== WAITING FOR SCHEMA ISSUE TO BE FIXED TO BE USABLE ===================================
+        # =========================================================================================================================
+
+        # Initialise Gemini model
+        model = generative_models.GenerativeModel(kw_args['model'])
+
+        # Initialise returned message list
+        _messages = []
+        
+        # Transform AgentX messages into Vertex AI messages
+        vertex_messages = [transform_message_vertexai(message) for message in messages]
+        
+        # Transform Vertex AI messages into Vertex AI generative_models.Content objects
+        vertex_content = [generative_models.Content(**vertex_message) if type(vertex_message) is dict else vertex_message for vertex_message in vertex_messages]
+
+        # Generate content based on the history of content
+        response = await model.generate_content(contents = vertex_content, tools = kw_args['tools'])
+
+        # Rename variable for lighted code
+        response_parts = response.candidates[0].content.parts[0]
+
+        # If the response indicates a function call procedure
+        if response_parts.function_call.args is not None:
+            
+            # Make sure we don't count the trick {'fields':'fields'} as a valid condition 
+            if len(response_parts.function_call.args) != 1 or 'fields' not in response_parts.function_call.args.keys():
+                
+                # {arg_name: arg_value} dictionary. If multiple values, {arg_name: {arg_1: arg_1_value, arg_2: arg_2_value}}
+                args_dict = {
+                    key: (
+                        response_parts.function_call.args[key]
+                        if isinstance(response_parts.function_call.args[key], str) # if string, then no nest in the response object
+                        else {
+                            subkey:
+                            response_parts.function_call.args[key][subkey] for subkey in response_parts.function_call.args[key]
+                        }
+                    )
+                    for key in response_parts.function_call.args
                 }
-            ) as response:
-                return await response.json()
+
+                # Remove the field from the dict (cf Google Protocol bug)
+                if 'fields' in args_dict:
+                    del args_dict['fields']
+
+                # Dump it for the API call
+                args_data = json.dumps(args_dict)
+
+                # Define tooi calls content
+                tool_calls = [
+                    ToolCall(
+                        id=response_parts.function_call.name.lower(),
+                        type="function",
+                        function_call=FunctionCall(
+                            name=response_parts.function_call.name.lower(), 
+                            arguments=args_data
+                        )
+                    )
+                ]
+
+                # Set it as the content
+                content = Content(
+                    tool_calls=tool_calls
+                )
+            else:
+                raise ValueError("Case {'fields':'fields}. This really shouldn't happen. Send an email to jeremy.kulcsar@diamondhill.io if it does.")
+            
+        else:
+            # If no function call, directly return the answer as content
+            content = Content(
+                text=response_parts.text,
+            )
+
+        # Fit the message object
+        _messages.append(
+            Message(
+                role=response.candidates[0].content.role,
+                content=content,
+            )
+        )
+        
+        if len(_messages) == 0:
+            return None
+        if reduce_function:
+            return reduce_function(_messages)
+        else:
+            return _messages
