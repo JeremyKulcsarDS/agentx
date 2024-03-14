@@ -1,5 +1,19 @@
 from pydantic import BaseModel, HttpUrl, FilePath
-from typing import Dict, List, Optional, Union, Literal
+from typing import Dict, List, Optional, Union, Literal, Any
+
+class OpenAPIFunctionSchema(BaseModel):
+    type: Optional[str] = None
+    format: Optional[str] = None
+    description: Optional[str] = None
+    nullable: Optional[bool] = None
+    items: Optional['OpenAPIFunctionSchema'] = None
+    enum: Optional[List[str]] = None
+    properties: Optional[Dict[str,'OpenAPIFunctionSchema']] = None
+    required: Optional[List[str]] = None
+    example: Optional[Any] = None
+
+class ToolParameters(BaseModel):
+    parameters: Dict[str, 'OpenAPIFunctionSchema']
 
 class Function(BaseModel):
     name:str
@@ -20,7 +34,7 @@ class ToolCall(BaseModel):
     function_call: FunctionCall
 
 class ToolResponse(BaseModel):
-    id:str
+    id:Optional[str] = None
     name:str
     content:str
 
