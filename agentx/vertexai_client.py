@@ -65,62 +65,45 @@ def transform_message_vertexai(message:Message) -> Dict:
         return add_name(
                 {
                     'role': message.role,
-                    'parts': [generative_models.Part.from_text(content.text)],
+                    'parts': [
+                        generative_models.Part.from_text(content.text)
+                    ],
                 },
-                message.name
+                None
             )
     else:
         pass
 
-    if message.role == 'assistant':
-        tool_calls = message.content.tool_calls
-        if tool_calls is not None:
-            _tool_calls = []
-            for tool_call in tool_calls:
-                _tool_calls.append({
-                    'type': 'function',
-                    'function': {
-                        'name': tool_call.function_call.name,
-                        'arguments': tool_call.function_call.arguments
-                    }
-                })
-            return add_name(
-                {
-                    'role': "function",
-                    'parts': [{'function_call':_tool_calls}],
-                },
-                message.name
-            )
-        
-        content = message.content
-        if content.files is None and content.urls is None and content.tool_calls is None and content.tool_response is None:
-            return add_name(
-                {
-                    'role': message.role,
-                    'parts': [{'text':content.text}],
-                },
-                None # Keep the same code structure, since Vertex AI API would return a JSON decode error if a name is left
-            )
+    if message.role == 'model':
+        return generative_models.Content.from_dict(
+            {
+                'role': message.role,
+                'parts': [
+                        {
+                            'function_call':{
+                                'name':message.content.tool_calls[0].function_call.name,
+                                'args':{
+                                    'fields': 'fields' # Condition in the Google protocol. Remove the key later.
+                                } | json.loads(message.content.tool_calls[0].function_call.arguments)
+                        }
+                    }            
+                ]
+            } 
+        )
     else:
         pass
 
     if message.role == 'tool':
         return {
-            'role': 'tool',
-            'content': message.content.tool_response.content,
-            'tool_call_id': message.content.tool_response.id,
+            'role': 'function',
+            'parts': [
+                generative_models.Part.from_function_response(
+                    name = message.content.tool_response.id, response = json.loads(
+                        message.content.tool_response.content
+                    )
+                )
+            ],
         }
-    
-""" def validate_function_call(tool_call:ChatCompletionMessageToolCall, config:GenerationConfig) -> bool: # adapt to Vertex AI
-    if tool_call.function.name.lower() not in config.tools.keys():
-        return False
-    try:
-        arguments = json.loads(tool_call.function.arguments)
-        schema = config.tools.get(tool_call.function.name.lower()).parameters
-        validate(arguments, schema)
-        return True
-    except:
-        return False """
 
 
 class VertexAIClient():
@@ -238,17 +221,6 @@ class VertexAIClient():
             }
         }
 
-        if generation_config.tools != None:
-            kw_args['tools'] = [
-                {
-                    'type':'function',
-                    'function':transform_openai_tool_to_vertexai_tool(tool)
-                } for tool in [test_dict_geocoding, test_dict_geodesic]
-            ]
-
-        xentropy_geocoding_tool = generative_models.FunctionDeclaration(**transform_openai_tool_to_vertexai_tool(test_dict_geocoding))  
-        xentropy_geodesic_tool = generative_models.FunctionDeclaration(**transform_openai_tool_to_vertexai_tool(test_dict_geodesic))  
-
         # Once the schema issue is solved, this will be uncommented 
         if generation_config.tools is not None:
             kw_args['function_declaration'] = [
@@ -259,23 +231,18 @@ class VertexAIClient():
 
         if generation_config.tools is not None:
             # Define a tool that includes the above functions
-            kw_args['tools'] = generative_models.Tool(
-                #function_declarations=kw_args['tools'], # THIS MUST WORK
-                # These functions are just dummies. After the schema issue is solved, this will turn into what is seen above. =====
-                function_declarations = kw_args['function_declaration']
-            )
-
-            # Initialise Gemini model
-            model = generative_models.GenerativeModel(kw_args['model'], tools=[kw_args['tools']])
-
-            # api keyuy elements
-            api_key=os.environ.get('XENTROPY_API_KEY')
-            headers = {
-                'Api-Key': api_key,
-            }
+            kw_args['tools'] = [
+                generative_models.Tool(
+                    #function_declarations=kw_args['tools'], # THIS MUST WORK
+                    # These functions are just dummies. After the schema issue is solved, this will turn into what is seen above. =====
+                    function_declarations = kw_args['function_declaration']
+                )
+            ]
         else:
-            # Initialise Gemini model
-            model = generative_models.GenerativeModel(kw_args['model'], tools=None)
+            kw_args['tools'] = None
+
+        # Initialise Gemini model
+        model = generative_models.GenerativeModel(kw_args['model'])
 
         # =================================== WAITING FOR SCHEMA ISSUE TO BE FIXED TO BE USABLE ===================================
         # =========================================================================================================================
@@ -283,25 +250,14 @@ class VertexAIClient():
         _messages = []
         vertex_messages = [transform_message_vertexai(message) for message in messages]
 
-        # Start a chat session
-        chat = model.start_chat()
-        print("1. chat session started")
+        vertex_content = [generative_models.Content(**vertex_message) if type(vertex_message) is dict else vertex_message for vertex_message in vertex_messages]
 
-        #for num_retry in range(generation_config.max_retries):
-        # Check if the message role is user. Indicates the first message of the session
-        # Gemini can only do sequential turns between user and model, so if it isn't a user message it is a response.
-        if vertex_messages[-1]['role'] == 'user':
-            print('2. role is user')
-            # Make the content readable by the API
-            user_prompt_content = generative_models.Content(**vertex_messages[-1])
+        # Send a prompt for the first conversation turn that should invoke the function
+        response = model.generate_content(contents = vertex_content, tools = kw_args['tools'])
 
-            # Send a prompt for the first conversation turn that should invoke the function
-            response = chat.send_message(content = user_prompt_content)
-
-            # If the response indicates a function call procedure
-            if response.candidates[0].content.parts[0].function_call.args is not None:
-                print("2.a. user response contains function args")
-                # Keep looping until Gemini is done doing his function call work
+        # If the response indicates a function call procedure
+        if response.candidates[0].content.parts[0].function_call.args is not None:
+            if len(response.candidates[0].content.parts[0].function_call.args) != 1 or 'fields' not in response.candidates[0].content.parts[0].function_call.args.keys():
                 # {arg_name: arg_value} dictionary. 
                 # Sometimes an argument can have multiple values, so it will become a dict of dict. {arg_name: {arg_1: arg_1_value, arg_2: arg_2_value}}
                 args_dict = {
@@ -315,6 +271,12 @@ class VertexAIClient():
                     )
                     for key in response.candidates[0].content.parts[0].function_call.args
                 }
+
+                # This is due to a bug in the Google protocol
+                # It only accepts customs arguments if the first field
+                # is "fields". We add it and then remove it before calling the tool.
+                if 'fields' in args_dict:
+                    del args_dict['fields']
 
                 # Dump it for the API call
                 args_data = json.dumps(args_dict)
@@ -330,94 +292,24 @@ class VertexAIClient():
                     )
                 ]
 
-                #if tool_calls == []:
-                #    continue
-
                 content = Content(
                     tool_calls=tool_calls
                 )
-                
-            # If no function call, directly return the answer
             else:
-                print("2.b. user response ocntains no function args")
-                content = Content(
-                    text=response.candidates[0].content.parts[0].text,
-                )
-
-        elif vertex_messages[-1]['role'] == 'tool':
-            print("3. role is tool, need to loop through history")
+                pass
             
-            for vertex_message in vertex_messages:
-                if vertex_message['role'] == 'user':
-                    print("3.a. initial user prompt for tool loop")
-                    user_prompt_content = generative_models.Content(**vertex_message)
-                    response = chat.send_message(content = user_prompt_content)
-
-                elif vertex_message['role'] == 'tool':
-                    print("3.b. following tool prompt in the list for tool loop")
-                    response = chat.send_message(
-                            generative_models.Part.from_function_response(
-                                name=vertex_message['tool_call_id'],
-                                response={
-                                    "content": vertex_message['content'],
-                                },
-                            ),
-                        )
-                    
-                    if response.candidates[0].content.parts[0].function_call.args is not None:
-                        print("3.b.a tool response contains function args")
-                        # Keep looping until Gemini is done doing his function call work
-                        # {arg_name: arg_value} dictionary. 
-                        # Sometimes an argument can have multiple values, so it will become a dict of dict. {arg_name: {arg_1: arg_1_value, arg_2: arg_2_value}}
-                        args_dict = {
-                            key: (
-                                response.candidates[0].content.parts[0].function_call.args[key]
-                                if isinstance(response.candidates[0].content.parts[0].function_call.args[key], str) # if string, then no nest in the response object
-                                else {
-                                    subkey:
-                                    response.candidates[0].content.parts[0].function_call.args[key][subkey] for subkey in response.candidates[0].content.parts[0].function_call.args[key]
-                                }
-                            )
-                            for key in response.candidates[0].content.parts[0].function_call.args
-                        }
-
-                        # Dump it for the API call
-                        args_data = json.dumps(args_dict)
-
-                        tool_calls = [
-                            ToolCall(
-                                id=response.candidates[0].content.parts[0].function_call.name.lower(),
-                                type="function",
-                                function_call=FunctionCall(
-                                    name=response.candidates[0].content.parts[0].function_call.name.lower(), 
-                                    arguments=args_data
-                                )
-                            )
-                        ]
-
-                        #if tool_calls == []:
-                        #    continue
-
-                        content = Content(
-                            tool_calls=tool_calls
-                        )
-
-                    # If no function call, directly return the answer
-                    else:
-                        print('3.b.b tool response returned an actual mnessage')
-                        content = Content(
-                            text=response.candidates[0].content.parts[0].text,
-                        )
+        # If no function call, directly return the answer
+        else:
+            content = Content(
+                text=response.candidates[0].content.parts[0].text,
+            )
 
         # Fit the message object
         _messages.append(Message(
-                #role=response.candidates[0].content.role,
-                role='assistant',
+                role=response.candidates[0].content.role,
                 content=content,
             )
         )
-
-        print("3. Chat session ended")
                 
         if reduce_function:
             return reduce_function(_messages)
