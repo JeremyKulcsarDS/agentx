@@ -15,13 +15,6 @@ class OpenAPIFunctionSchema(BaseModel):
 class ToolParameters(BaseModel):
     parameters: Dict[str, 'OpenAPIFunctionSchema']
 
-class QuestionRequest(BaseModel):
-    subject: Literal['Physics', 'Chemistry', 'Biology', 'Economics', 'Mathematics'] = 'Physics'
-    topic: Optional[str] = None
-    detail: Optional[str] = None
-    taxonomy: Literal['knowledge', 'comprehension', 'application', 'analysis', 'synthesis', 'evaluation'] = 'knowledge'
-    question_format: Literal['short_answer', 'multiple_choice', 'true_false', 'fill_in_the_blank', 'matching', 'essay'] = 'short_answer'
-
 class Function(BaseModel):
     name:str
     description:str
