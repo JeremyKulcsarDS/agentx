@@ -2,17 +2,12 @@ from google.cloud import aiplatform
 import google.auth
 import google.auth.transport.requests
 from google.oauth2 import service_account
-import aiohttp
 import json
-import os
-from typing import Callable, List, Dict, Optional, Union, Any
-import requests
+from typing import Callable, List, Dict, Optional, Union
 from pydantic import BaseModel
 
 from agentx.schema import Message, ToolCall, FunctionCall, GenerationConfig, Content
-
 from agentx.vertexai_utils import transform_openai_tool_to_vertexai_tool
-
 from vertexai import generative_models
 
 VERTEXAI_API_KW = [
@@ -235,7 +230,7 @@ class VertexAIClient():
             # Define a tool that includes the above functions
             kw_args['tools'] = [
                 generative_models.Tool(
-                    #function_declarations=kw_args['tools'], # THIS MUST WORK
+                    # function_declarations=kw_args['tools'], # THIS MUST WORK
                     # These functions are just dummies. After the schema issue is solved, this will turn into what is seen above. =====
                     function_declarations = kw_args['function_declaration']
                 )
