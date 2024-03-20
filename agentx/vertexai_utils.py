@@ -1,5 +1,6 @@
 import copy
-from typing import Dict, Optional, Any
+from typing import Dict, Optional, Any, List
+from vertexai import generative_models
 
 GAPIC_SCHEMA_FIELDS = [
     "type", 
@@ -151,3 +152,61 @@ def transform_openai_tool_to_vertexai_tool(dictionary: dict) -> dict:
     dictionary_copy_fields_moved_to_prop["parameters"]["properties"] = change_field_name_to_description(pop_properties(pop_parameters(dictionary_copy_fields_moved_to_prop)))
 
     return dictionary_copy_fields_moved_to_prop
+
+
+def add_empty_messages(list_messages: List[generative_models.Content]) -> List[generative_models.Content]:
+    """
+    Adds empty model messages between consecutive messages with the same role.
+    
+    Vertex AI cannot handle multiturn with the same role.
+    If the user role appears twice in a row, put an empty model message in between.
+    This can happen for instance if a system prompt is given.
+    
+    This function isn't used yet in the client since we replaced it with a simple injection of the 
+    system prompt content into the first user message content.
+
+    Args:
+        list_messages (List[generative_models.Content]): List of messages to process.
+
+    Returns:
+        List[generative_models.Content]: List of messages with empty model messages inserted.
+
+    Example:
+        list_messages = [
+            Content(role="user", parts=[Part.from_text("Hello")]),
+            Content(role="user", parts=[Part.from_text("Please wait")]),
+            Content(role="model", parts=[Part.from_text("Processing...")]),
+            Content(role="user", parts=[Part.from_text("Can you provide more details?")])
+        ]
+
+        result = add_empty_messages(list_messages)
+
+        print(result)
+
+        Output:
+        [
+            Content(role="user", parts=[Part.from_text("Hello")]),
+            Content(role="model", parts=[Part.from_text("Add the above message to the next one.")]),
+            Content(role="user", parts=[Part.from_text("Please wait")]),
+            Content(role="model", parts=[Part.from_text("Processing...")]),
+            Content(role="user", parts=[Part.from_text("Can you provide more details?")])
+        ]
+    """
+    # Create the empty model message
+    empty_content_model_msg = generative_models.Content(
+        role="model",
+        parts=[
+            generative_models.Part.from_text("Add the above message to the next one.")
+        ]
+    )
+
+    # Add the empty message between every pair that has the same role
+    list_messages_multiturn = []
+    for i in range(len(list_messages) - 1):
+        list_messages_multiturn.append(list_messages[i])
+        if list_messages[i].role == list_messages[i + 1].role:
+            list_messages_multiturn.append(empty_content_model_msg)
+
+    list_messages_multiturn.append(list_messages[-1])
+
+    return list_messages_multiturn

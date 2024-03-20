@@ -43,7 +43,7 @@ def add_name(message:Dict, name:Optional[str]=None) -> Dict:
     return message
 
 
-def transform_message_vertexai(message:Message) -> Union[Dict, generative_models.Content]:
+def transform_message_vertexai(message:Message) -> generative_models.Content:
     """
     Transforms a message for the Vertex AI system.
 
@@ -54,21 +54,37 @@ def transform_message_vertexai(message:Message) -> Union[Dict, generative_models
         Dict: The transformed message dictionary.
     """
 
-    if message.role == 'user':
+    if message.role == 'system':
         content = message.content
-        return add_name(
-                {
-                    'role': message.role,
-                    'parts': [
-                        generative_models.Part.from_text(content.text)
-                    ],
-                },
-                None
+        return generative_models.Content(
+                **add_name(
+                    {
+                        'role': 'user',
+                        'parts': [
+                            generative_models.Part.from_text(content.text)
+                        ],
+                    }
+                )
             )
     else:
         pass
 
-    if message.role == 'model':
+    if message.role == 'user':
+        content = message.content
+        return generative_models.Content(
+                **add_name(
+                    {
+                        'role': message.role,
+                        'parts': [
+                            generative_models.Part.from_text(content.text)
+                        ],
+                    }
+                )
+            )
+    else:
+        pass
+
+    if message.role == 'assistant':
         return generative_models.Content.from_dict(
             {
                 'role': message.role,
@@ -88,16 +104,20 @@ def transform_message_vertexai(message:Message) -> Union[Dict, generative_models
         pass
 
     if message.role == 'tool':
-        return {
-            'role': 'function',
-            'parts': [
-                generative_models.Part.from_function_response(
-                    name = message.content.tool_response.id, response = json.loads(
-                        message.content.tool_response.content
-                    )
-                )
-            ],
-        }
+        return generative_models.Content(
+                **{
+                    'role': 'function',
+                    'parts': [
+                        generative_models.Part.from_function_response(
+                            name = message.content.tool_response.id, response = json.loads(
+                                message.content.tool_response.content
+                            )
+                        )
+                    ],
+                }
+            )
+        
+    return None
 
 
 class VertexAIClient():
@@ -243,16 +263,23 @@ class VertexAIClient():
 
         # Initialise Gemini model
         model = generative_models.GenerativeModel(kw_args['model'])
-
+        
+        # Gemini doesn't support system roles, so if the first message is a system,
+        # it will be injected into the following one (which will always be a user one)
+        if messages[0].role == "system":
+            system_message = messages[0].content.text
+            messages[1].content.text = \
+            f"""{system_message}
+            
+            {messages[1].content.text}"""
+            messages.pop(0)
+        
         # Initialise returned message list
         _messages = []
         
-        # Transform AgentX messages into Vertex AI messages
-        vertex_messages = [transform_message_vertexai(message) for message in messages]
+        # Transform AgentX messages into Vertex AI generative_models.Content objects
+        vertex_content = [transform_message_vertexai(message) for message in messages]
         
-        # Transform Vertex AI messages into Vertex AI generative_models.Content objects
-        vertex_content = [generative_models.Content(**vertex_message) if type(vertex_message) is dict else vertex_message for vertex_message in vertex_messages]
-
         # Generate content based on the history of content
         response = model.generate_content(contents = vertex_content, tools = kw_args['tools'])
 
@@ -313,7 +340,7 @@ class VertexAIClient():
         # Fit the message object
         _messages.append(
             Message(
-                role=response.candidates[0].content.role,
+                role='assistant',
                 content=content,
             )
         )
