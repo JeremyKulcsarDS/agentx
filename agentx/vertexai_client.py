@@ -7,7 +7,7 @@ from typing import Callable, List, Dict, Optional, Union
 from pydantic import BaseModel
 
 from agentx.schema import Message, ToolCall, FunctionCall, GenerationConfig, Content
-from agentx.vertexai_utils import transform_openai_tool_to_vertexai_tool
+from agentx.vertexai_utils import transform_agentx_tool_to_vertexai_tool
 from vertexai import generative_models
 
 VERTEXAI_API_KW = [
@@ -164,105 +164,29 @@ class VertexAIClient():
         # Model
         kw_args['model'] = generation_config.model
 
-        # =========================================================================================================================
-        # =================================== WAITING FOR SCHEMA ISSUE TO BE FIXED TO BE USABLE ===================================
-
-        # Creating dummy variables as the current tools are stored with a wrongful schema
-        test_dict_geocoding = {
-            'name': 'xentropy--geocoding',
-            'description': 'Retrieve the latitude and longitude given an address using the highly accurate Google Map API.',
-            'parameters': {
-                'title': 'Address',
-                'type': 'object',
-                'properties': {
-                    'address': {
-                        'title': 'Address',
-                        'type': 'string'
-                    }
-                },
-                'required': [
-                'address'
-                ]
-            }
-        }
-
-        test_dict_geodesic = {
-            'name': 'xentropy--geodesic',
-            'description': 'Calculate the earth surface distance between two latitude and longitude coordinate',
-            'parameters': {
-                'title': 'CoordinatePair',
-                'type': 'object',
-                'properties': {
-                    'coordinate_0': {
-                        'type': 'object',
-                        'description': 'Coordinate',
-                        'properties': {
-                            'latitude': {
-                                'title': 'Latitude',
-                                'type': 'number'
-                            },
-                            'longitude': {
-                                'title': 'Longitude',
-                                'type': 'number'
-                            }
-                        },
-                        'required': [
-                            'latitude',
-                            'longitude'
-                        ]
-                    },
-                    'coordinate_1': {
-                        'type': 'object',
-                        'description': 'Coordinate',
-                        'properties': {
-                            'latitude': {
-                                'title': 'Latitude',
-                                'type': 'number'
-                            },
-                            'longitude': {
-                                'title': 'Longitude',
-                                'type': 'number'
-                            }
-                        },
-                        'required': [
-                            'latitude',
-                            'longitude'
-                        ]
-                    }
-                },
-                'required': [
-                    'coordinate_0',
-                    'coordinate_1'
-                ]
-            }
-        }
-
         # Initialise tools if there is any
         if generation_config.tools is not None:
             
             # Declare the functions within the tools
             kw_args['function_declaration'] = [
                 generative_models.FunctionDeclaration(
-                    **transform_openai_tool_to_vertexai_tool(tool)
-                ) for tool in [test_dict_geocoding, test_dict_geodesic]
+                    **transform_agentx_tool_to_vertexai_tool(tool.model_dump())
+                ) for tool in generation_config.tools.values()
             ]
             
             # Define a tool that includes the above functions
             kw_args['tools'] = [
                 generative_models.Tool(
-                    # function_declarations=kw_args['tools'], # THIS MUST WORK
-                    # These functions are just dummies. After the schema issue is solved, this will turn into what is seen above. =====
                     function_declarations = kw_args['function_declaration']
                 )
             ]
         else:
             kw_args['tools'] = None
-            
-        # =================================== WAITING FOR SCHEMA ISSUE TO BE FIXED TO BE USABLE ===================================
-        # =========================================================================================================================
 
         # Initialise Gemini model
-        model = generative_models.GenerativeModel(kw_args['model'])
+        model = generative_models.GenerativeModel(
+                kw_args['model']
+            )
         
         # Gemini doesn't support system roles, so if the first message is a system,
         # it will be injected into the following one (which will always be a user one)
