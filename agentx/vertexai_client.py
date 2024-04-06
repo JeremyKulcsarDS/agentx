@@ -10,7 +10,7 @@ from agentx.schema import Message, ToolCall, FunctionCall, GenerationConfig, Con
 from agentx.vertexai_utils import transform_agentx_tool_to_vertexai_tool
 from vertexai import generative_models
 
-GENERATION_CONFIG_KW = [
+VERTEXAI_API_KW = [
     'temperature',
     'top_p',
     'top_k',
@@ -149,7 +149,7 @@ class VertexAIClient():
         ) -> Union[Message, List[Message], None]:
 
         # kwargs (to be adapted later)
-        kw_args = {key:value for key, value in generation_config.model_dump().items() if value != None and key in GENERATION_CONFIG_KW}
+        kw_args = {key:value for key, value in generation_config.model_dump().items() if value != None and key in VERTEXAI_API_KW}
 
         # Model
         model = generative_models.GenerativeModel(
@@ -382,7 +382,7 @@ class VertexAIClient():
             # Declare the functions within the tools
             kw_args['function_declaration'] = [
                 generative_models.FunctionDeclaration(
-                    **transform_openai_tool_to_vertexai_tool(tool)
+                    **transform_agentx_tool_to_vertexai_tool(tool)
                 ) for tool in [test_dict_geocoding, test_dict_geodesic]
             ]
             

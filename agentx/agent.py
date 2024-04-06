@@ -141,21 +141,23 @@ class Agent():
                     )
 
                     deserialised_response = json.loads(response)
-                    files = deserialised_response.get('files')
-                    if files != None:
-                        files = [File(**file) for file in files]
-                    urls = deserialised_response.get('url')
-                    if files != None or urls != None:
-                        multimodal_responses.append(
-                            Message(
-                                role='user',
-                                content = Content(
-                                    files=files,
-                                    url=urls
-                                ),
-                                name=self.name,
+
+                    if isinstance(deserialised_response, dict):
+                        files = deserialised_response.get('files', None)
+                        if files != None:
+                            files = [File(**file) for file in files]
+                        urls = deserialised_response.get('url', None)
+                        if files != None or urls != None:
+                            multimodal_responses.append(
+                                Message(
+                                    role='user',
+                                    content = Content(
+                                        files=files,
+                                        url=urls
+                                    ),
+                                    name=self.name,
+                                )
                             )
-                        )
 
             generated_messages += tool_responses + multimodal_responses
 
@@ -241,21 +243,22 @@ class Agent():
                 )
 
                 deserialised_response = json.loads(response)
-                files = deserialised_response.get('files')
-                if files != None:
-                    files = [File(**file) for file in files]
-                urls = deserialised_response.get('url')
-                if files != None or urls != None:
-                    multimodal_responses.append(
-                        Message(
-                            role='user',
-                            content = Content(
-                                files=files,
-                                url=urls
-                            ),
-                            name=self.name,
+                if isinstance(deserialised_response, dict):
+                    files = deserialised_response.get('files')
+                    if files != None:
+                        files = [File(**file) for file in files]
+                    urls = deserialised_response.get('url')
+                    if files != None or urls != None:
+                        multimodal_responses.append(
+                            Message(
+                                role='user',
+                                content = Content(
+                                    files=files,
+                                    url=urls
+                                ),
+                                name=self.name,
+                            )
                         )
-                    )
 
             generated_messages += tool_responses + multimodal_responses
 
