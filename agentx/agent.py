@@ -167,6 +167,8 @@ class Agent():
                 reduce_function=self.reduce_function,
                 output_model=output_model,
             )
+            if second_message == None:
+                return None
             second_message.name = self.name
             generated_messages += [second_message]
             tool_calls = generated_messages[-1].content.tool_calls
