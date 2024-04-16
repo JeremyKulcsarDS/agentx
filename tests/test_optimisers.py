@@ -6,9 +6,9 @@ import os
 from random import sample
 from pydantic import BaseModel
 from dotenv import load_dotenv
-from agentx.schema import GenerationConfig, Message, Content
-from agentx.agent import Agent
-from agentx.optimisers import TextualGradientPromptTrainer
+from siumai.schema import GenerationConfig, Message, Content
+from siumai.agent import Agent
+from siumai.optimisers import TextualGradientPromptTrainer
 
 load_dotenv()
 
@@ -30,7 +30,7 @@ class TrueSalary(BaseModel):
 class TextualGradientPromptTrainerTest(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         dataset = read_parquet(
-            '~/agentx/docs/data/job_posting_2023.parquet'
+            '~/siumai/docs/data/job_posting_2023.parquet'
         )
 
         dataset.skill_set = dataset.skill_set.apply(lambda x: json.loads(x))

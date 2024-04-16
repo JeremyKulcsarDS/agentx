@@ -1,10 +1,10 @@
 import unittest
 import os
 from dotenv import load_dotenv
-from agentx.schema import Message, Content, GenerationConfig
-from agentx.oai_client import OAIClient
-from agentx.vertexai_client import VertexAIClient
-from agentx.bedrock_client import BedrockClient
+from siumai.schema import Message, Content, GenerationConfig
+from siumai.oai_client import OAIClient
+from siumai.vertexai_client import VertexAIClient
+from siumai.bedrock_client import BedrockClient
 
 load_dotenv()
 

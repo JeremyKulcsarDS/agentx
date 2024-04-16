@@ -6,8 +6,8 @@ import json
 from typing import Callable, List, Dict, Optional, Union
 from pydantic import BaseModel
 
-from agentx.schema import Message, ToolCall, FunctionCall, GenerationConfig, Content
-from agentx.vertexai_utils import transform_agentx_tool_to_vertexai_tool
+from siumai.schema import Message, ToolCall, FunctionCall, GenerationConfig, Content
+from siumai.vertexai_utils import transform_siumai_tool_to_vertexai_tool
 from vertexai import generative_models
 
 VERTEXAI_API_KW = [
@@ -162,7 +162,7 @@ class VertexAIClient():
             # Declare the functions within the tools
             function_declarations = [
                 generative_models.FunctionDeclaration(
-                    **transform_agentx_tool_to_vertexai_tool(tool.model_dump())
+                    **transform_siumai_tool_to_vertexai_tool(tool.model_dump())
                 ) for tool in generation_config.tools.values()
             ]
             

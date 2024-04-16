@@ -4,10 +4,10 @@ import unittest
 import os
 from pydantic import BaseModel
 from dotenv import load_dotenv
-from agentx.schema import GenerationConfig, Message, Content, ToolResponse, Function
-from agentx.agent import Agent
-from agentx.utils import encode_image
-from agentx.tool import Tool
+from siumai.schema import GenerationConfig, Message, Content, ToolResponse, Function
+from siumai.agent import Agent
+from siumai.utils import encode_image
+from siumai.tool import Tool
 
 load_dotenv()
 

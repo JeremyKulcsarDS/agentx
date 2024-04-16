@@ -1,7 +1,7 @@
 import base64
 from typing import Callable, Coroutine, List, Union
 from inspect import iscoroutinefunction
-from agentx.schema import Message
+from siumai.schema import Message
 
 def encode_image(image_file):
     return base64.b64encode(image_file.read()).decode('utf-8')
