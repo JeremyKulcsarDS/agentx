@@ -3,11 +3,11 @@ from copy import deepcopy
 import json
 from typing import List, Callable, Optional, Union, TypeVar
 from pydantic import BaseModel
-from agentx.schema import Message, Content, ToolResponse, GenerationConfig, File, Function
-from agentx.tool import Tool
-import agentx.oai_client
-import agentx.vertexai_client
-import agentx.bedrock_client
+from siumai.schema import Message, Content, ToolResponse, GenerationConfig, File, Function
+from siumai.tool import Tool
+import siumai.oai_client
+import siumai.vertexai_client
+import siumai.bedrock_client
 
 OutputType = TypeVar('OutputType')
 class Agent():
@@ -67,17 +67,17 @@ class Agent():
         self.reduce_function = reduce_function
 
         if self.generation_config.api_type in ['openai', 'fastchat', 'azure']:
-            self.client = agentx.oai_client.OAIClient(
+            self.client = siumai.oai_client.OAIClient(
                 generation_config=self.generation_config
             )
 
         if self.generation_config.api_type == 'vertexai':
-            self.client = agentx.vertexai_client.VertexAIClient(
+            self.client = siumai.vertexai_client.VertexAIClient(
                 generation_config=generation_config
             )
         
         if self.generation_config.api_type == 'bedrock':
-            self.client = agentx.bedrock_client.BedrockClient()
+            self.client = siumai.bedrock_client.BedrockClient()
 
 
     def generate_response(

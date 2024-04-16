@@ -1,6 +1,6 @@
 from hashlib import sha256
 import uuid
-import agentx.models
+import siumai.models
 import requests
 import aiohttp
 import os
@@ -77,7 +77,7 @@ class Tool():
                 filename = id
                 with open(f'{path}/models/{filename}_{key}.py', 'w') as f:
                     f.write(value)
-                module = reload(agentx.models)
+                module = reload(siumai.models)
                 submodule = getattr(module, f'{filename}_{key}')
                 model = getattr(submodule, to_camel_case(key))
                 setattr(tool, key, model)

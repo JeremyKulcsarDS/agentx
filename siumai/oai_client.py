@@ -4,7 +4,7 @@ from jsonschema import validate
 from openai.types.chat import ChatCompletion, ChatCompletionMessage, ChatCompletionMessageToolCall
 from typing import Dict, List, Callable, Optional, Union
 from pydantic import BaseModel
-from agentx.schema import Message, Content, ToolCall, FunctionCall, GenerationConfig
+from siumai.schema import Message, Content, ToolCall, FunctionCall, GenerationConfig
 
 OEPNAI_API_KW = [
     'model',

@@ -1,9 +1,9 @@
 import asyncio
 import random
 import copy
-from agentx.agent import Agent
-from agentx.schema import Message, Content, GenerationConfig
-from agentx.saved_agents import GradientAgent, BackpropAgent
+from siumai.agent import Agent
+from siumai.schema import Message, Content, GenerationConfig
+from siumai.saved_agents import GradientAgent, BackpropAgent
 from typing import Awaitable, Dict, List, Tuple, Callable, Union, Any, TypeVar
 from math import ceil
 from statistics import mean

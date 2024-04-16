@@ -6,8 +6,8 @@ import json
 from typing import Callable, List, Dict, Optional, Union
 from pydantic import BaseModel
 
-from agentx.schema import Message, ToolCall, FunctionCall, GenerationConfig, Content
-from agentx.vertexai_utils import transform_agentx_tool_to_vertexai_tool
+from siumai.schema import Message, ToolCall, FunctionCall, GenerationConfig, Content
+from siumai.vertexai_utils import transform_agentx_tool_to_vertexai_tool
 from vertexai import generative_models
 
 GENERATION_CONFIG_KW = [

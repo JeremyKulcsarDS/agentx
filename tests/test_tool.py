@@ -1,7 +1,7 @@
 import unittest
 import os
 from dotenv import load_dotenv
-from agentx.tool import Tool
+from siumai.tool import Tool
 from pydantic import BaseModel, Field
 
 load_dotenv()

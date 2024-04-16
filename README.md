@@ -1,4 +1,4 @@
-# AgentX
+# SiumAI
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
@@ -8,7 +8,7 @@ AgentX enables developers to build powerful LLM (Large Language Model) agents fa
 3. Planning (a way to plan and execute actions to reach a goal)
 4. Tools (arbitrary sensors, actuators, and other LLM agents)
 
-AgentX comes in as a platform for developers to share tools they built and load existing tools to speed up development. It also provides a set of utilities for automated planning and execution of tools orchestrated with a set of agents.
+SiumAI comes in as a platform for developers to share tools they built and load existing tools to speed up development. It also provides a set of utilities for automated planning and execution of tools orchestrated with a set of agents.
 
 For more information about LLM agents we highly recommend reading this [blog](https://lilianweng.github.io/posts/2023-06-23-agent/) by Lilian Weng.
 
@@ -38,18 +38,18 @@ For more information about LLM agents we highly recommend reading this [blog](ht
 To install the project, clone this repository and copy to your python site-packages directory:
 
 ```bash
-git clone https://github.com/xentropy-ai/agentx.git
+git clone https://github.com/xentropy-ai/siumAI.git
 cd agentx
 cp -r agentx /usr/local/lib/python3.8/site-packages/ # replace with your own site-packages directory
 ```
 
 ## Documentation
 
-Refer to the [docs](https://github.com/xentropy-ai/agentx/tree/main/docs) for advanced usage and full documentation of all the features of AgentX.
+Refer to the [docs](https://github.com/xentropy-ai/siumAI/tree/main/docs) for advanced usage and full documentation of all the features of SiumAI.
 
 ## Contribution
 
-If you want to contribute, feel free to fork the repository and submit pull requests. If you found any bugs or have suggestions, please create an issue in the [issues](https://github.com/xentropy-ai/agentx/issues) section.
+If you want to contribute, feel free to fork the repository and submit pull requests. If you found any bugs or have suggestions, please create an issue in the [issues](https://github.com/xentropy-ai/siumAI/issues) section.
 
 ## Contact
 

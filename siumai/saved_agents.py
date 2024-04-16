@@ -1,4 +1,4 @@
-from agentx.agent import Agent
+from siumai.agent import Agent
 
 
 class GradientAgent(Agent):

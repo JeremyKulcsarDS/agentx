@@ -6,9 +6,9 @@ import os
 from random import sample
 from pydantic import BaseModel
 from dotenv import load_dotenv
-from agentx.schema import GenerationConfig, Message, Content
-from agentx.agent import Agent
-from agentx.optimisers import TextualGradientPromptTrainer
+from siumai.schema import GenerationConfig, Message, Content
+from siumai.agent import Agent
+from siumai.optimisers import TextualGradientPromptTrainer
 
 load_dotenv()
 
