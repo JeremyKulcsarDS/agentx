@@ -1,9 +1,9 @@
 import unittest, os
 from dotenv import load_dotenv
-from agentx.tool import Tool
-from agentx.agent import Agent
-from agentx.schema import GenerationConfig, Function, Message, Content
-from agentx.groupchat import astarchat
+from siumai.tool import Tool
+from siumai.agent import Agent
+from siumai.schema import GenerationConfig, Function, Message, Content
+from siumai.groupchat import astarchat
 from pydantic import BaseModel, Field
 from typing import List
 

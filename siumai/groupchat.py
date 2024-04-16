@@ -1,7 +1,7 @@
 import asyncio
 from copy import deepcopy, copy
 import queue
-from agentx.agent import Agent, Message
+from siumai.agent import Agent, Message
 from typing import Callable, List, Union, Tuple, Dict
 from pydantic import BaseModel
 from tqdm import tqdm

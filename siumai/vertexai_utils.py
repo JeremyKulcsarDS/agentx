@@ -203,7 +203,7 @@ def move_defs_to_root(dictionary: Dict[str, Any]) -> Dict[str, Any]:
     return dictionary_copy
 
 
-def transform_agentx_tool_to_vertexai_tool(dictionary: dict) -> dict:
+def transform_siumai_tool_to_vertexai_tool(dictionary: dict) -> dict:
     """
     Transforms an OpenAI tool dictionary to a Vertex AI tool dictionary by performing the following steps:
     1. Moves extra fields to properties.
