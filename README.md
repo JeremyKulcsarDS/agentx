@@ -2,7 +2,7 @@
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-AgentX enables developers to build powerful LLM (Large Language Model) agents fast. LLM agents uses LLM as a controlling element to perform a wide range of tasks that require context awareness and reasoning. These agents are typically characterized by 4 components:
+SiumAI enables developers to build powerful LLM (Large Language Model) agents fast. LLM agents uses LLM as a controlling element to perform a wide range of tasks that require context awareness and reasoning. These agents are typically characterized by 4 components:
 1. Large language model
 2. Memory (chat and tool use history)
 3. Planning (a way to plan and execute actions to reach a goal)
@@ -39,8 +39,8 @@ To install the project, clone this repository and copy to your python site-packa
 
 ```bash
 git clone https://github.com/xentropy-ai/siumAI.git
-cd agentx
-cp -r agentx /usr/local/lib/python3.8/site-packages/ # replace with your own site-packages directory
+cd siumAI
+cp -r siumAI /usr/local/lib/python3.8/site-packages/ # replace with your own site-packages directory
 ```
 
 ## Documentation
