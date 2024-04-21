@@ -1,5 +1,5 @@
 import requests
-from typing import Optional
+from typing import Literal, Optional, Union
 from pydantic import EmailStr
 from eth_account import Account
 from eth_account.messages import encode_defunct
@@ -45,7 +45,7 @@ class Client():
         signature = account.sign_message(message_hash).signature.hex()
 
         response = requests.post(
-            f'{self.url}/register_ethereum_address',
+            f'{self.url}/users/register_ethereum_address',
             json={
                 'user_id': self.user_id,
                 'address': account.address,
@@ -58,9 +58,10 @@ class Client():
         )
         return response
 
-    def stable_coin_payout(self, amount: int, address: str, stable_coin: str):
+
+    def stable_coin_payout(self, amount: float, stable_coin: Literal['usdt', 'usdc', 'dai'], address: Optional[str] = None):
         response = requests.post(
-            f'{self.url}/stable_coin_payout',
+            f'{self.url}/payout/stable_coin',
             json={
                 'amount': amount,
                 'address': address,
@@ -73,9 +74,10 @@ class Client():
 
         return response
 
-    def transfer_payout_to_balance(self, amount: int):
+
+    def transfer_payout_to_balance(self, amount: float):
         response = requests.post(
-            f'{self.url}/balance_transfer',
+            f'{self.url}/payout/balance',
             params={
                 'amount': amount,
             },
@@ -85,6 +87,7 @@ class Client():
         ).json()
 
         return response
+
 
     def log(
         self,

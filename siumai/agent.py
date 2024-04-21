@@ -141,21 +141,23 @@ class Agent():
                     )
 
                     deserialised_response = json.loads(response)
-                    files = deserialised_response.get('files')
-                    if files != None:
-                        files = [File(**file) for file in files]
-                    urls = deserialised_response.get('url')
-                    if files != None or urls != None:
-                        multimodal_responses.append(
-                            Message(
-                                role='user',
-                                content = Content(
-                                    files=files,
-                                    url=urls
-                                ),
-                                name=self.name,
+
+                    if isinstance(deserialised_response, dict):
+                        files = deserialised_response.get('files', None)
+                        if files != None:
+                            files = [File(**file) for file in files]
+                        urls = deserialised_response.get('url', None)
+                        if files != None or urls != None:
+                            multimodal_responses.append(
+                                Message(
+                                    role='user',
+                                    content = Content(
+                                        files=files,
+                                        url=urls
+                                    ),
+                                    name=self.name,
+                                )
                             )
-                        )
 
             generated_messages += tool_responses + multimodal_responses
 
@@ -165,6 +167,8 @@ class Agent():
                 reduce_function=self.reduce_function,
                 output_model=output_model,
             )
+            if second_message == None:
+                return None
             second_message.name = self.name
             generated_messages += [second_message]
             tool_calls = generated_messages[-1].content.tool_calls
@@ -241,21 +245,22 @@ class Agent():
                 )
 
                 deserialised_response = json.loads(response)
-                files = deserialised_response.get('files')
-                if files != None:
-                    files = [File(**file) for file in files]
-                urls = deserialised_response.get('url')
-                if files != None or urls != None:
-                    multimodal_responses.append(
-                        Message(
-                            role='user',
-                            content = Content(
-                                files=files,
-                                url=urls
-                            ),
-                            name=self.name,
+                if isinstance(deserialised_response, dict):
+                    files = deserialised_response.get('files')
+                    if files != None:
+                        files = [File(**file) for file in files]
+                    urls = deserialised_response.get('url')
+                    if files != None or urls != None:
+                        multimodal_responses.append(
+                            Message(
+                                role='user',
+                                content = Content(
+                                    files=files,
+                                    url=urls
+                                ),
+                                name=self.name,
+                            )
                         )
-                    )
 
             generated_messages += tool_responses + multimodal_responses
 

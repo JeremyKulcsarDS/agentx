@@ -22,6 +22,15 @@ OEPNAI_API_KW = [
     'top_p'
 ]
 
+def openai_parse_kw_args(kw_args:Dict) -> Dict:
+    result = {key:value for key, value in kw_args.items() if value != None and key in OEPNAI_API_KW}
+    if kw_args.get('n_candidates') > 1:
+        result['n'] = kw_args.get('n_candidates')
+    else:
+        result['n'] = 1
+
+    return result
+
 def add_name(message:Dict, name:Optional[str]=None) -> Dict:
     if name != None:
         message['name'] = name
@@ -172,7 +181,7 @@ class OAIClient():
             output_model:BaseModel = None,
     ) -> Union[Message, List[Message], None]:
         # call the openai api
-        kw_args = {key:value for key, value in generation_config.model_dump().items() if value != None and key in OEPNAI_API_KW}
+        kw_args = openai_parse_kw_args(generation_config.model_dump())
 
         if output_model != None:
             messages.append(
@@ -269,9 +278,8 @@ class OAIClient():
         output_model:BaseModel = None
     ) -> Union[Message, List[Message], None]:
         # call the openai api
-
-        kw_args = {key:value for key, value in generation_config.model_dump().items() if value != None and key in OEPNAI_API_KW}
-
+        kw_args = openai_parse_kw_args(generation_config.model_dump())
+        
         if output_model != None:
             messages.append(
                 Message(
